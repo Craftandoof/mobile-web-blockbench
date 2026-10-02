@@ -1,0 +1,26 @@
+--- a/package.json
++++ b/package.json
+@@ -151,7 +151,10 @@
+ 		"webapp": "git checkout gh-pages && git pull && git merge master --no-edit && git push && git checkout master",
+ 		"generate-types": "tsc --project tsconfig.json && node ./scripts/convert_types.js",
+ 		"publish-types": "npm publish ./types",
+-		"generate-docs": "npm run generate-types && npx typedoc --options typedoc.json"
++		"generate-docs": "npm run generate-types && npx typedoc --options typedoc.json",
++		"android:prepare": "node scripts/prepare-www.mjs",
++		"android:add": "npx cap add android && node scripts/android-overlay.mjs",
++		"android:sync": "node scripts/prepare-www.mjs && node scripts/android-overlay.mjs && npx cap sync android"
+ 	},
+ 	"overrides": {
+ 		"three": "$three"
+@@ -189,7 +192,10 @@
+ 		"vue": "^2.7.16",
+ 		"vue-sortable": "^0.1.3",
+ 		"wintersky": "^1.3.2",
+-		"workbox-build": "^7.4.1"
++		"workbox-build": "^7.4.1",
++		"@capacitor/android": "^7.4.0",
++		"@capacitor/cli": "^7.4.0",
++		"@capacitor/core": "^7.4.0"
+ 	},
+ 	"dependencies": {
+ 		"@electron/remote": "^2.1.2",

@@ -1,0 +1,37 @@
+// Run after `npx cap add android`. Copies native sources and patches AndroidManifest.xml (idempotent).
+import fs from 'node:fs';
+import path from 'node:path';
+
+const pkgDir = 'android/app/src/main/java/com/craftandoof/blockbench';
+fs.mkdirSync(pkgDir, { recursive: true });
+for (const f of fs.readdirSync('android-overlay/java')) {
+  fs.copyFileSync(path.join('android-overlay/java', f), path.join(pkgDir, f));
+}
+
+const manifestPath = 'android/app/src/main/AndroidManifest.xml';
+let m = fs.readFileSync(manifestPath, 'utf8');
+
+const perms = [
+  'android.permission.FOREGROUND_SERVICE',
+  'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+  'android.permission.POST_NOTIFICATIONS',
+  'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+  'android.permission.WAKE_LOCK',
+];
+for (const p of perms) {
+  if (!m.includes(p)) m = m.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
+}
+if (!m.includes('KeepAliveService')) {
+  m = m.replace('</application>', `
+        <service
+            android:name=".KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the open model editing session alive in the background" />
+        </service>
+    </application>`);
+}
+fs.writeFileSync(manifestPath, m);
+console.log('Android overlay applied');

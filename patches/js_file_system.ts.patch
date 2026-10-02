@@ -1,0 +1,11 @@
+--- a/js/file_system.ts
++++ b/js/file_system.ts
+@@ -357,6 +357,8 @@
+ 	 * @returns 
+ 	 */
+ 	export function exportFile(options: ExportOptions, callback?: (file_path: string) => void) {
++		// Android (Capacitor) build: native Save dialog instead of a blob download
++		if (!isApp && (window as any).AndroidBridge?.active && (window as any).AndroidBridge.exportFile(options, callback)) return;
+ 		/*	
+ 			type
+ 			extensions
