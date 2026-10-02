@@ -13,12 +13,14 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
+      - name: Apply Android setup (patches + package.json)
+        run: node scripts/android-setup.mjs --keep-workflows
       - name: Install deps
         run: npm install --no-audit --no-fund --ignore-scripts
         env: { ELECTRON_SKIP_BINARY_DOWNLOAD: "1" }
       - name: Build web into ./www
-        run: npm run android:prepare
-      - name: Add Android platform (first run only)
+        run: node scripts/prepare-www.mjs
+      - name: Add Android platform
         run: test -d android || npx cap add android
       - name: Apply native overlay
         run: node scripts/android-overlay.mjs

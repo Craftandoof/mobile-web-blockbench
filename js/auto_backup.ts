@@ -44,6 +44,11 @@ export const AutoBackup = {
 			
 			// Start Screen Message
 			let has_backups = await AutoBackup.hasBackups();
+			// Android: reopen the projects that were open last time instead of asking
+			if (has_backups && (window as any).AndroidBridge?.active) {
+				has_backups = false;
+				AutoBackup.recoverAllBackups(false).catch(console.error);
+			}
 			// @ts-expect-error
 			if (has_backups && (!isApp || !currentwindow.webContents.second_instance)) {
 

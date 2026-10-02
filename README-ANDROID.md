@@ -11,10 +11,10 @@ Base: Blockbench 5.2.1, target **web** (não o Electron). A ponte só ativa dent
 | App precisa continuar aberto | — | `KeepAliveService` (serviço em primeiro plano, tipo `specialUse`) + `resumeTimers()` no `onPause` |
 
 ## Como aplicar no clone do Blockbench
-1. Copie para a raiz do repo: `js/android/`, `scripts/`, `android-overlay/`, `capacitor.config.json`, `.github/workflows/android.yml`
-2. `git apply patches/*.patch` (ou aplique as 5 mudanças à mão: 1 hook em `file_system.ts`, 1 bloco em `codec.ts`, 1 bloco em `auto_backup.ts`, 1 import em `main.ts`, scripts/deps em `package.json`)
-3. `npm install` → `npm run android:add` (1ª vez) → `npm run android:sync`
-4. APK: `cd android && ./gradlew assembleDebug`, ou rode o workflow **Build Android APK** no GitHub Actions.
+1. Copie o conteúdo deste zip para a raiz do repo (mesclando pastas): `js/android/`, `scripts/`, `patches/`, `android-overlay/`, `capacitor.config.json`, `.github/workflows/android.yml`
+2. Na raiz do repo: `node scripts/android-setup.mjs` — aplica os patches (pula os já aplicados), adiciona as deps do Capacitor e os scripts `android:*` no `package.json` e **apaga os outros workflows** do GitHub (use `--keep-workflows` para manter).
+3. `git add -A && git commit && git push` — o workflow **Build Android APK** roda sozinho e também por "Run workflow". O APK sai em Artifacts.
+4. Local (opcional): `npm install` → `npm run android:add` (1ª vez) → `npm run android:sync` → `cd android && ./gradlew assembleDebug`.
 
 ## Limites conhecidos / a testar no aparelho
 - O seletor de salvar do Android nunca sobrescreve: se `player.jem` já existir na pasta, ele cria `player (1).jem`.

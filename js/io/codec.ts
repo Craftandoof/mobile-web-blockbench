@@ -168,6 +168,11 @@ export class Codec extends EventSystem {
 			Project.export_codec = this.id;
 		}
 
+		// Web/Android: keep the opened file's name so export suggests e.g. player.jem instead of model.jem
+		if (!isApp && file && file.name && this.remember && !file.no_file && !args.import_to_current_project) {
+			Project.name = pathToName(file.name, false);
+		}
+
 		this.parse(model, file.path, args)
 
 		if (file.path && isApp && this.remember && !file.no_file ) {

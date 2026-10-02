@@ -357,6 +357,8 @@ export namespace Filesystem {
 	 * @returns 
 	 */
 	export function exportFile(options: ExportOptions, callback?: (file_path: string) => void) {
+		// Android (Capacitor) build: native Save dialog instead of a blob download
+		if (!isApp && (window as any).AndroidBridge?.active && (window as any).AndroidBridge.exportFile(options, callback)) return;
 		/*	
 			type
 			extensions

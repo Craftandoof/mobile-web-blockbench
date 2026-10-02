@@ -1,3 +1,4 @@
+import './android/android_bridge';
 
 import "./lib/libs"
 import "./lib/jquery-ui.min"
