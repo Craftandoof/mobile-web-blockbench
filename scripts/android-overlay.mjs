@@ -8,6 +8,11 @@ for (const f of fs.readdirSync('android-overlay/java')) {
   fs.copyFileSync(path.join('android-overlay/java', f), path.join(pkgDir, f));
 }
 
+// Ícones e splash do Blockbench (gerados por scripts/generate-android-assets.py)
+if (fs.existsSync('android-overlay/res')) {
+  fs.cpSync('android-overlay/res', 'android/app/src/main/res', { recursive: true, force: true });
+}
+
 const manifestPath = 'android/app/src/main/AndroidManifest.xml';
 let m = fs.readFileSync(manifestPath, 'utf8');
 

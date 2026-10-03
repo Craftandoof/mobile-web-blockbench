@@ -10,6 +10,9 @@ Base: Blockbench 5.2.1, target **web** (não o Electron). A ponte só ativa dent
 | Modelos abertos somem | `AutoBackup` salva só o projeto **selecionado**, a cada ≥5 s, e a recuperação depende de um clique na tela inicial | Salva ao ir para segundo plano (`visibilitychange`/`pagehide`) e antes de trocar de aba (`save_editor_state`); `AutoBackup.initialize()` reabre os projetos automaticamente ao iniciar (patch em `auto_backup.ts`, sem o aviso de recuperar) |
 | App precisa continuar aberto | — | `KeepAliveService` (serviço em primeiro plano, tipo `specialUse`) + `resumeTimers()` no `onPause` |
 
+## Ícone e splash
+`scripts/generate-android-assets.py` gera ícones (legado + adaptativo) e splash a partir de `icon.png` / `icon_maskable.png`, em `android-overlay/res/`. `android-overlay.mjs` copia isso por cima do template do Capacitor (troca o ícone e o splash padrão).
+
 ## Como aplicar no clone do Blockbench
 1. Copie o conteúdo deste zip para a raiz do repo (mesclando pastas): `js/android/`, `scripts/`, `patches/`, `android-overlay/`, `capacitor.config.json`, `.github/workflows/android.yml`
 2. Na raiz do repo: `node scripts/android-setup.mjs` — aplica os patches (pula os já aplicados), adiciona as deps do Capacitor e os scripts `android:*` no `package.json` e **apaga os outros workflows** do GitHub (use `--keep-workflows` para manter).

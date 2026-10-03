@@ -5,9 +5,17 @@
  *  2. flushes + auto-restores open projects so work survives the app being killed
  *  3. starts a foreground service that keeps the process alive in the background
  */
-const cap = (window as any).Capacitor;
-const isNative: boolean = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
-const Native: any = isNative ? cap.registerPlugin('BlockbenchNative') : null;
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+let isNative = false;
+let Native: any = null;
+try {
+	isNative = Capacitor.isNativePlatform();
+	if (isNative) Native = registerPlugin('BlockbenchNative');
+} catch (err) {
+	console.error('Android bridge unavailable', err);
+	isNative = false;
+}
 
 function whenReady(test: () => boolean, run: () => void, timeout = 60000) {
 	const start = Date.now();
@@ -89,7 +97,7 @@ export const AndroidBridge = {
 	},
 };
 
-if (isNative) {
+if (isNative) try {
 	(window as any).AndroidBridge = AndroidBridge;
 
 	// --- Session persistence ---
@@ -118,4 +126,6 @@ if (isNative) {
 			try { await Native.startKeepAlive(); } catch (e) { console.error(e); }
 		})();
 	}
+} catch (err) {
+	console.error('Android bridge init failed', err);
 }
