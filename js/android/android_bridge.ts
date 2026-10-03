@@ -6,6 +6,7 @@
  *  3. starts a foreground service that keeps the process alive in the background
  */
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { initAndroidUi } from './android_menu';
 
 let isNative = false;
 let Native: any = null;
@@ -92,6 +93,14 @@ export const AndroidBridge = {
 		localStorage.setItem('bb_android_keepalive', enabled ? '1' : '0');
 		if (enabled) await Native.startKeepAlive(); else await Native.stopKeepAlive();
 	},
+	keepAliveEnabled(): boolean {
+		return localStorage.getItem('bb_android_keepalive') !== '0';
+	},
+	/** Para o serviço Keep Alive, fecha a Activity e encerra o processo. */
+	async forceQuit() {
+		if (!isNative) { window.close(); return; }
+		await Native.forceQuit();
+	},
 	async requestBatteryExemption() {
 		if (isNative) await Native.requestBatteryExemption();
 	},
@@ -117,8 +126,17 @@ if (isNative) try {
 	});
 	// Reopening of previous projects happens in AutoBackup.initialize() (see patches/js_auto_backup.ts.patch)
 
+	// --- Menu flutuante, Enviar Input, configurações e controles de touch ---
+	initAndroidUi({
+		isNative,
+		keepAliveEnabled: () => AndroidBridge.keepAliveEnabled(),
+		setKeepAlive: enabled => AndroidBridge.setKeepAlive(enabled),
+		forceQuit: () => AndroidBridge.forceQuit(),
+		flush,
+	});
+
 	// --- Keep-alive ---
-	if (localStorage.getItem('bb_android_keepalive') !== '0') {
+	if (AndroidBridge.keepAliveEnabled()) {
 		(async () => {
 			try {
 				await Native.requestPermissions({ permissions: ['notifications'] });

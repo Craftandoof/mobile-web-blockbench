@@ -31,12 +31,16 @@ if (!m.includes('KeepAliveService')) {
         <service
             android:name=".KeepAliveService"
             android:exported="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps the open model editing session alive in the background" />
         </service>
     </application>`);
+}
+if (m.includes('KeepAliveService') && !m.includes('android:stopWithTask')) {
+  m = m.replace('android:name=".KeepAliveService"', 'android:name=".KeepAliveService"\n            android:stopWithTask="true"');
 }
 fs.writeFileSync(manifestPath, m);
 console.log('Android overlay applied');

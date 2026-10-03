@@ -13,6 +13,19 @@ Base: Blockbench 5.2.1, target **web** (não o Electron). A ponte só ativa dent
 ## Ícone e splash
 `scripts/generate-android-assets.py` gera ícones (legado + adaptativo) e splash a partir de `icon.png` / `icon_maskable.png`, em `android-overlay/res/`. `android-overlay.mjs` copia isso por cima do template do Capacitor (troca o ícone e o splash padrão).
 
+## Menu flutuante (☰) e controles de touch
+Código em `js/android/` (carregado só dentro do app Android):
+- `android_menu.ts` — botão ☰ no topo central e os menus laterais empilhados (Enviar Input, Configurações Persistentes, Forçar Encerramento). O Voltar do Android fecha o menu de cima sem desfazer nada no Blockbench.
+- `touch_controls.ts` + `touch_editor.ts` — controles na tela e editor de perfis. `pojav_format.ts` lê/grava o **mesmo JSON do PojavLauncher** (versões 2–8; campos `mControlDataList`, `mDrawerDataList`, `mJoystickDataList`, `dynamicX/Y` com `${margin}`, `${width}`…, códigos GLFW e botões especiais −1…−9). `keymap.ts` traduz GLFW → teclas do DOM (gerado a partir do `LwjglGlfwKeycode.java` do Pojav).
+- `input_emulator.ts` — teclado, mouse (botões, rolagem, ponteiro virtual estilo trackpad) e teclado virtual.
+- Perfis ficam no `localStorage` do app; exportar/importar usa o seletor nativo de arquivos.
+
+**Keep Alive:** o serviço agora é `START_NOT_STICKY`, tem `stopWithTask`, para em `onTaskRemoved` e quando a Activity é fechada de verdade (`onDestroy` com `isFinishing`). "Forçar Encerramento" para o serviço, remove a tarefa e mata o processo.
+
+**Forçar Versão de Computador:** grava `bb_android_force_desktop`; um script injetado no `index.html` (por `prepare-www.mjs`) troca o viewport para 1280 px na abertura seguinte. Exige recarregar.
+
+**Não portado do Pojav** (não faz sentido no Blockbench): rotação de câmera "grab", hotbar, e o formato v1 (sem `version`).
+
 ## Como aplicar no clone do Blockbench
 1. Copie o conteúdo deste zip para a raiz do repo (mesclando pastas): `js/android/`, `scripts/`, `patches/`, `android-overlay/`, `capacitor.config.json`, `.github/workflows/android.yml`
 2. Na raiz do repo: `node scripts/android-setup.mjs` — aplica os patches (pula os já aplicados), adiciona as deps do Capacitor e os scripts `android:*` no `package.json` e **apaga os outros workflows** do GitHub (use `--keep-workflows` para manter).

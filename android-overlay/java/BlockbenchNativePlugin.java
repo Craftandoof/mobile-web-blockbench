@@ -1,11 +1,14 @@
 package com.craftandoof.blockbench;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
@@ -106,6 +109,27 @@ public class BlockbenchNativePlugin extends Plugin {
         Context ctx = getContext();
         ctx.stopService(new Intent(ctx, KeepAliveService.class));
         call.resolve();
+    }
+
+    /** Forçar Encerramento: derruba o Keep Alive, fecha a tarefa e mata o processo. */
+    @PluginMethod
+    public void forceQuit(PluginCall call) {
+        final Context ctx = getContext();
+        final Activity activity = getActivity();
+        ctx.stopService(new Intent(ctx, KeepAliveService.class));
+        call.resolve();
+        final Handler main = new Handler(Looper.getMainLooper());
+        main.postDelayed(new Runnable() {
+            @Override public void run() {
+                if (activity != null) activity.finishAndRemoveTask();
+                main.postDelayed(new Runnable() {
+                    @Override public void run() {
+                        android.os.Process.killProcess(android.os.Process.myPid());
+                        System.exit(0);
+                    }
+                }, 300);
+            }
+        }, 150);
     }
 
     @PluginMethod

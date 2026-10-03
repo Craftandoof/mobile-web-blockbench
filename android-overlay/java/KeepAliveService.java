@@ -38,7 +38,8 @@ public class KeepAliveService extends Service {
         } else {
             startForeground(NOTIFICATION_ID, n);
         }
-        return START_STICKY;
+        // Não ressuscitar sozinho: se o processo morrer, o serviço morre junto.
+        return START_NOT_STICKY;
     }
 
     private void createChannel() {
@@ -47,6 +48,18 @@ public class KeepAliveService extends Service {
                 CHANNEL_ID, "Sessão em segundo plano", NotificationManager.IMPORTANCE_LOW);
             getSystemService(NotificationManager.class).createNotificationChannel(ch);
         }
+    }
+
+    /** App removido dos recentes (deslizar para fechar): encerra o serviço e some a notificação. */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        shutdown();
+        super.onTaskRemoved(rootIntent);
+    }
+
+    private void shutdown() {
+        stopForeground(true);
+        stopSelf();
     }
 
     @Override
