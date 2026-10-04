@@ -104,6 +104,17 @@ export function loadModelFile(file, args) {
 		let success = loadIfCompatible(Codecs[id], 'json', model);
 		if (success) return;
 	}
+	// Android: "ignorar limitação de arquivo" — sem extensão conhecida, tenta os formatos JSON que reconhecem o conteúdo
+	if (window.AndroidBridge && window.AndroidBridge.ignoreFileLimits && window.AndroidBridge.ignoreFileLimits() && model && typeof model == 'object') {
+		for (let id in Codecs) {
+			let codec = Codecs[id];
+			if (!codec.load_filter || codec.load_filter.type != 'json' || !codec.load_filter.condition) continue;
+			if (Condition(codec.load_filter.condition, model)) {
+				codec.load(model, file, args);
+				return;
+			}
+		}
+	}
 	unsupportedFileFormatMessage(file.path);
 }
 

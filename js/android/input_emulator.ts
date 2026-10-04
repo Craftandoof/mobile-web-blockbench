@@ -211,23 +211,29 @@ function ensureCursor() {
 }
 
 let hoverEl: Element | null = null;
+const HOVER_ATTR = 'data-bb-hover';
+const chainOf = (el: Element | null) => { const a: Element[] = []; for (let n = el; n; n = n.parentElement) a.push(n); return a; };
 
-/** Dispara over/enter/out/leave como um mouse de verdade (os menus do Blockbench abrem por mouseenter/mouseover). */
+/**
+ * Dispara over/enter/out/leave como um mouse de verdade (os menus do Blockbench abrem por mouseenter/mouseover)
+ * e marca a cadeia sob o cursor com data-bb-hover, que faz o papel do :hover real (ver instalarHoverShim).
+ */
 function updateHover(next: Element | null) {
 	const prev = hoverEl;
 	if (prev === next) return;
 	hoverEl = next;
-	const chain = (el: Element | null) => { const a: Element[] = []; for (let n = el; n; n = n.parentElement) a.push(n); return a; };
-	const prevChain = chain(prev), nextChain = chain(next);
+	const prevChain = chainOf(prev), nextChain = chainOf(next);
 	if (prev) {
 		fire('pointerout', prev, -1, { relatedTarget: next });
 		fire('mouseout', prev, 0, { relatedTarget: next });
 		for (const el of prevChain) if (!nextChain.includes(el)) {
+			el.removeAttribute(HOVER_ATTR);
 			fire('pointerleave', el, -1, { bubbles: false, relatedTarget: next });
 			fire('mouseleave', el, 0, { bubbles: false, relatedTarget: next });
 		}
 	}
 	if (next) {
+		for (const el of nextChain) if (!el.hasAttribute(HOVER_ATTR)) el.setAttribute(HOVER_ATTR, '');
 		fire('pointerover', next, -1, { relatedTarget: prev });
 		fire('mouseover', next, 0, { relatedTarget: prev });
 		for (const el of nextChain.slice().reverse()) if (!prevChain.includes(el)) {
@@ -235,6 +241,56 @@ function updateHover(next: Element | null) {
 			fire('mouseenter', el, 0, { bubbles: false, relatedTarget: prev });
 		}
 	}
+}
+
+// ---- :hover do mouse virtual
+// Eventos sintéticos não atualizam o :hover real do navegador, e o Blockbench consulta :hover em vários pontos
+// (menus e submenus, painel sob o mouse, outliner...). Com o mouse virtual ativo, qualquer seletor com ":hover"
+// passa a significar "tem data-bb-hover", e as regras CSS de :hover são duplicadas para o mesmo atributo.
+let hoverShimInstalled = false;
+let hoverShimOn = false;
+const rewriteHover = (sel: any) => (hoverShimOn && typeof sel === 'string' && sel.indexOf(':hover') >= 0) ? sel.replace(/:hover/g, '[' + HOVER_ATTR + ']') : sel;
+
+function installHoverShim() {
+	if (hoverShimInstalled || typeof Element === 'undefined') return;
+	hoverShimInstalled = true;
+	const patch = (proto: any, names: string[]) => {
+		if (!proto) return;
+		for (const name of names) {
+			const orig = proto[name];
+			if (typeof orig !== 'function') continue;
+			proto[name] = function (this: any, sel: any, ...rest: any[]) { return orig.call(this, rewriteHover(sel), ...rest); };
+		}
+	};
+	patch(Element.prototype, ['matches', 'webkitMatchesSelector', 'closest', 'querySelector', 'querySelectorAll']);
+	patch(typeof Document !== 'undefined' ? Document.prototype : null, ['querySelector', 'querySelectorAll']);
+	patch(typeof DocumentFragment !== 'undefined' ? DocumentFragment.prototype : null, ['querySelector', 'querySelectorAll']);
+	// jQuery guardou o matches nativo ao carregar: $(el).is(':hover') não passa pelo protótipo
+	const jq = (window as any).jQuery || (window as any).$;
+	if (jq && jq.find && typeof jq.find.matchesSelector === 'function') {
+		const orig = jq.find.matchesSelector;
+		jq.find.matchesSelector = (elem: any, expr: any) => orig(elem, rewriteHover(expr));
+	}
+}
+
+let hoverCssSheets = -1;
+function syncHoverCss() {
+	if (typeof document === 'undefined') return;
+	const sheets = Array.from(document.styleSheets).filter(s => (s.ownerNode as any)?.id !== 'bb-android-hover-css');
+	if (sheets.length === hoverCssSheets) return;
+	hoverCssSheets = sheets.length;
+	const out: string[] = [];
+	const visit = (rules: any, wrap: (css: string) => string) => {
+		for (const r of Array.from(rules || []) as any[]) {
+			if (typeof r.selectorText === 'string') {
+				if (r.selectorText.includes(':hover')) out.push(wrap(r.selectorText.replace(/:hover/g, '[' + HOVER_ATTR + ']') + '{' + r.style.cssText + '}'));
+			} else if (r.media && r.cssRules) visit(r.cssRules, css => wrap('@media ' + r.media.mediaText + '{' + css + '}'));
+		}
+	};
+	for (const sheet of sheets) { try { visit((sheet as CSSStyleSheet).cssRules, css => css); } catch { /* folha de outra origem */ } }
+	let style = document.getElementById('bb-android-hover-css') as HTMLStyleElement | null;
+	if (!style) { style = document.createElement('style'); style.id = 'bb-android-hover-css'; document.head.appendChild(style); }
+	style.textContent = out.join('\n');
 }
 
 export function moveTo(x: number, y: number) {
@@ -272,6 +328,7 @@ export function mouseDown(btn: MouseBtn) {
 	const t = pointTarget();
 	updateHover(t);
 	Mouse.buttons |= BTN_MASK[btn];
+	syncTouchpad();
 	downAt[btn] = { x: Mouse.x, y: Mouse.y, t: Date.now() };
 	fire('pointerdown', t, BTN_INDEX[btn]);
 	const md = fire('mousedown', t, BTN_INDEX[btn]);
@@ -305,6 +362,7 @@ export function mouseUp(btn: MouseBtn) {
 		} else if (btn === 'right') fire('contextmenu', t, 2);
 		else fire('auxclick', t, 1);
 	}
+	syncTouchpad();
 }
 export function click(btn: MouseBtn = 'left') { mouseDown(btn); mouseUp(btn); }
 function canScroll(el: Element, dy: number, dx: number): boolean {
@@ -332,83 +390,86 @@ export function wheel(deltaY: number, deltaX = 0) {
 
 export function setVirtualMouse(on: boolean) {
 	Mouse.virtual = on;
-	if (!on) updateHover(null);
+	syncTouchpad();
 	ensureCursor();
 	updateCursor();
 	document.dispatchEvent(new CustomEvent('bb-android-vmouse', { detail: on }));
 }
 export const toggleVirtualMouse = () => setVirtualMouse(!Mouse.virtual);
 
-// ------------------------------------------------------------------ roteamento de toques (mouse virtual / botões do mouse segurados)
+// ------------------------------------------------------------------ touchpad (como o Pojav)
+// Com o mouse ativo (cursor virtual ligado, ou algum botão do mouse apertado) uma camada cobre o app, abaixo dos
+// controles e dos menus: os dedos NUNCA chegam ao Blockbench; servem só para mover o cursor, tocar (clique) e rolar.
+// Isso evita o clique real duplicado, o :hover real e o zoom de pinça do Android.
 
-const blockedPointers = new Set<number>();
-const blockedTouches = new Set<number>();
-let scrollY: number | null = null;
-let track: { id: number; sx: number; sy: number; lx: number; ly: number; t0: number; moved: boolean } | null = null;
+let padEl: HTMLElement | null = null;
+const pads = new Map<number, { x: number; y: number; sx: number; sy: number; t0: number; moved: boolean }>();
+let padScrollY: number | null = null;
 
-const intercepting = () => Mouse.virtual || Mouse.buttons !== 0;
-const stop = (e: Event) => { e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault(); };
+export const mouseActive = () => Mouse.virtual || Mouse.buttons !== 0;
 
-function onPointer(e: PointerEvent) {
-	if (e.pointerType === 'mouse') return;
-	const id = e.pointerId;
-	if (e.type === 'pointerdown') {
-		if (isUi(e.target)) return;
-		if (intercepting()) { blockedPointers.add(id); stop(e); }
-		return;
-	}
-	if (blockedPointers.has(id)) {
-		stop(e);
-		if (e.type === 'pointerup' || e.type === 'pointercancel') blockedPointers.delete(id);
-	}
-}
-function onTouch(e: TouchEvent) {
-	if (e.type === 'touchstart') {
-		const t = e.changedTouches[0];
-		if (isUi(e.target)) return;
-		if (!intercepting()) { if (t) { Mouse.x = t.clientX; Mouse.y = t.clientY; updateCursor(); } return; }
-		for (const ch of Array.from(e.changedTouches)) blockedTouches.add(ch.identifier);
-		stop(e);
-		if (!track && t) {
-			track = { id: t.identifier, sx: t.clientX, sy: t.clientY, lx: t.clientX, ly: t.clientY, t0: Date.now(), moved: false };
-			if (!Mouse.virtual) moveTo(t.clientX, t.clientY);
-		}
-		return;
-	}
-	const mine = Array.from(e.changedTouches).filter(ch => blockedTouches.has(ch.identifier));
-	if (!mine.length) return;
-	stop(e);
-	// dois dedos = rolagem (como no trackpad)
-	if (e.type === 'touchmove' && e.touches.length >= 2 && Mouse.virtual) {
-		const y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-		if (scrollY !== null) wheel(scrollY - y);
-		scrollY = y;
-		if (track) track.moved = true;
-		return;
-	}
-	if (e.touches.length < 2) scrollY = null;
-	const t = track && mine.find(ch => ch.identifier === track!.id);
-	if (e.type === 'touchmove' && t && track) {
-		const dx = t.clientX - track.lx, dy = t.clientY - track.ly;
-		track.lx = t.clientX; track.ly = t.clientY;
-		if (Math.hypot(t.clientX - track.sx, t.clientY - track.sy) > 8) track.moved = true;
-		if (Mouse.virtual) moveBy(dx * Mouse.sensitivity, dy * Mouse.sensitivity); else moveTo(t.clientX, t.clientY);
-	} else if (e.type === 'touchend' || e.type === 'touchcancel') {
-		if (t && track) {
-			if (e.type === 'touchend' && Mouse.virtual && !track.moved && Date.now() - track.t0 < 260) click('left');
-			track = null;
-		}
-		for (const ch of mine) blockedTouches.delete(ch.identifier);
-	}
+export function syncTouchpad() {
+	const on = mouseActive();
+	hoverShimOn = on;
+	if (padEl) padEl.style.display = on ? 'block' : 'none';
+	if (typeof document !== 'undefined') document.documentElement.classList.toggle('bb-mouse-active', on);
+	if (on) syncHoverCss();
+	else { pads.clear(); padScrollY = null; updateHover(null); }
 }
 
-let routerInstalled = false;
-export function installTouchRouter() {
-	if (routerInstalled) return;
-	routerInstalled = true;
-	const opt = { capture: true, passive: false } as AddEventListenerOptions;
-	for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) window.addEventListener(t, onPointer as any, opt);
-	for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) window.addEventListener(t, onTouch as any, opt);
+function padPointer(e: PointerEvent) { e.preventDefault(); e.stopPropagation(); }
+
+function onPadDown(e: PointerEvent) {
+	if (e.pointerType === 'mouse') return;       // mouse físico: deixa passar
+	padPointer(e);
+	try { padEl!.setPointerCapture(e.pointerId); } catch { /* ok */ }
+	pads.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t0: Date.now(), moved: false });
+	if (pads.size === 1 && !Mouse.virtual) moveTo(e.clientX, e.clientY);   // sem cursor virtual: posição absoluta
+	if (pads.size >= 2) { for (const p of pads.values()) p.moved = true; padScrollY = null; }
+}
+function onPadMove(e: PointerEvent) {
+	const p = pads.get(e.pointerId);
+	if (!p) return;
+	padPointer(e);
+	const dx = e.clientX - p.x, dy = e.clientY - p.y;
+	p.x = e.clientX; p.y = e.clientY;
+	if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) p.moved = true;
+	if (pads.size >= 2) {
+		// dois dedos = rolagem
+		const ys = Array.from(pads.values()).slice(0, 2).map(q => q.y);
+		const avg = (ys[0] + ys[1]) / 2;
+		if (padScrollY !== null) wheel(padScrollY - avg);
+		padScrollY = avg;
+		return;
+	}
+	if (Mouse.virtual) moveBy(dx * Mouse.sensitivity, dy * Mouse.sensitivity); else moveTo(e.clientX, e.clientY);
+}
+function onPadEnd(e: PointerEvent) {
+	const p = pads.get(e.pointerId);
+	if (!p) return;
+	padPointer(e);
+	const lone = pads.size === 1;
+	pads.delete(e.pointerId);
+	if (pads.size < 2) padScrollY = null;
+	// toque curto, sem arrastar, com o cursor virtual = clique esquerdo (como no Pojav)
+	if (lone && e.type === 'pointerup' && Mouse.virtual && !p.moved && Date.now() - p.t0 < 260) click('left');
+}
+
+let touchpadInstalled = false;
+export function installTouchpad() {
+	if (touchpadInstalled || typeof document === 'undefined') return;
+	touchpadInstalled = true;
+	installHoverShim();
+	padEl = document.createElement('div');
+	padEl.id = 'bb-android-touchpad';
+	padEl.className = UI_CLASS;
+	document.body.appendChild(padEl);
+	padEl.addEventListener('pointerdown', onPadDown);
+	padEl.addEventListener('pointermove', onPadMove);
+	padEl.addEventListener('pointerup', onPadEnd);
+	padEl.addEventListener('pointercancel', onPadEnd);
+	for (const t of ['touchstart', 'touchmove', 'touchend', 'contextmenu']) padEl.addEventListener(t, e => { if (e.cancelable) e.preventDefault(); e.stopPropagation(); }, { passive: false });
+	syncTouchpad();
 }
 
 // ------------------------------------------------------------------ teclado virtual do Android

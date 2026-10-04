@@ -7,9 +7,10 @@ import {
 	newControl, newDrawer, newJoystick, newLayout, specialButton, cloneControl, cloneLayout,
 	argbToCss, evalDynamic, parseLayout, serializeLayout, LAYOUT_VERSION,
 } from './pojav_format';
+import { DEFAULT_LAYOUT_JSON } from './default_layout';
 import * as Input from './input_emulator';
 import { UI_CLASS } from './input_emulator';
-import { h, Store, uiScale, toast } from './ui_kit';
+import { h, Store, uiScale, toast, isolateEvents } from './ui_kit';
 
 export type Kind = 'button' | 'drawer' | 'sub' | 'joystick';
 
@@ -29,46 +30,14 @@ export interface Item {
 const PREF_BUTTON_SIZE = 100;
 const MARGIN_DP = 2;
 
-// ------------------------------------------------------------------ layout padrão (modelo Blockbench)
+// ------------------------------------------------------------------ layout padrão
 
 /**
- * Layout padrão do fork: quatro drawers no centro inferior, cada um agrupa um tipo de botão.
- * Fechado, o drawer não ocupa a tela; o usuário abre só o que está usando.
- * (O formato e o comportamento dos controles continuam idênticos ao do Pojav; muda só este arquivo padrão.)
+ * Layout padrão do fork: o perfil "Blockbench_1.json" (ver default_layout.ts), no formato do Pojav.
+ * Devolve sempre uma cópia nova, já convertida para a versão atual do formato.
  */
 export function defaultLayout(): Layout {
-	const L = newLayout();
-	const key = (name: string, keys: number[], extra: Partial<ControlData> = {}) => newControl({ name, keycodes: keys, ...extra });
-	const groups: { name: string; subs: ControlData[] }[] = [
-		{ name: 'Mouse', subs: [
-			key('Esq', [SPECIAL.MOUSEPRI]), key('Dir', [SPECIAL.MOUSESEC]), key('Meio', [SPECIAL.MOUSEMID]),
-			key('Rolar ▲', [SPECIAL.SCROLLUP]), key('Rolar ▼', [SPECIAL.SCROLLDOWN]), key('Ponteiro', [SPECIAL.VIRTUALMOUSE]),
-		] },
-		{ name: 'Ctrl/Alt', subs: [
-			key('Ctrl', [341], { isToggle: true }), key('Shift', [340], { isToggle: true }), key('Alt', [342], { isToggle: true }),
-		] },
-		{ name: 'Edição', subs: [
-			key('Desfazer', [341, 90]), key('Refazer', [341, 89]), key('Copiar', [341, 67]), key('Colar', [341, 86]),
-			key('Tudo', [341, 65]), key('Salvar', [341, 83]), key('Excluir', [261]),
-		] },
-		{ name: 'Teclas', subs: [
-			key('Teclado', [SPECIAL.KEYBOARD]), key('Esc', [256]), key('Tab', [258]), key('Enter', [257]),
-			key('Espaço', [32]), key('⌫', [259]),
-		] },
-	];
-	const n = groups.length;
-	groups.forEach((g, i) => {
-		const x = `0.5 * \${screen_width} - \${width} * ${n / 2} - \${margin} * ${(n - 1) * 1.5} + (\${width} + \${margin} * 3) * ${i}`;
-		const d = newDrawer({ name: g.name, dynamicX: x, dynamicY: '${bottom} - ${margin}', width: 92, height: 42 });
-		d.orientation = 'UP';
-		d.buttonProperties = g.subs.map(c => { c.width = 92; c.height = 42; return c; });
-		L.mDrawerDataList.push(d);
-	});
-	// único botão solto: mostrar/ocultar todos os controles
-	L.mControlDataList.push(newControl({
-		name: 'GUI', keycodes: [SPECIAL.TOGGLECTRL], dynamicX: '${margin}', dynamicY: '${bottom} - ${margin}', width: 56, height: 42,
-	}));
-	return L;
+	return parseLayout(JSON.parse(JSON.stringify(DEFAULT_LAYOUT_JSON)), metrics().dpr, { w: window.innerWidth, h: window.innerHeight });
 }
 
 // ------------------------------------------------------------------ perfis (persistência)
@@ -592,11 +561,12 @@ export const Controls = {
 		state.guidesEl = h('div', { id: 'bb-android-guides', class: UI_CLASS });
 		state.root.append(state.gridEl, state.guidesEl);
 		document.body.appendChild(state.root);
+		isolateEvents(state.root);
 		state.grid = Math.max(1, Math.min(32, Store.get<number>('edit_grid', 1)));
 		state.showGrid = Store.get<boolean>('edit_show_grid', true);
 		state.magnet = Store.get<boolean>('edit_magnet', true);
 		window.addEventListener('resize', () => { if (state.layout) { placeAll(); } drawGrid(); });
-		Input.installTouchRouter();
+		Input.installTouchpad();
 		Controls.loadActive();
 	},
 

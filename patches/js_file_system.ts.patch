@@ -1,6 +1,15 @@
 --- a/js/file_system.ts
 +++ b/js/file_system.ts
-@@ -357,6 +357,8 @@
+@@ -75,6 +75,8 @@
+ 	 * @returns 
+ 	 */
+ 	export function importFile(options: ImportOptions, callback?: (files: FileResult[]) => void) {
++		// Android (Capacitor) build: com "ignorar limitação de arquivo" o seletor abre sem filtro de tipo
++		if (!isApp && (window as any).AndroidBridge?.active && (window as any).AndroidBridge.importFile(options, (files: File[]) => readFile(files, options, callback))) return;
+ 		if (isApp) {
+ 			let properties = ['openFile'] as any[];
+ 			if (options.multiple) {
+@@ -357,6 +359,8 @@
  	 * @returns 
  	 */
  	export function exportFile(options: ExportOptions, callback?: (file_path: string) => void) {

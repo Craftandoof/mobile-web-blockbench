@@ -19,13 +19,16 @@ Código em `js/android/` (carregado só dentro do app Android):
 - `send_keyboard.ts` — **Enviar Input**: teclado completo (abas ① e ②). Tocar numa tecla só a seleciona; "Enviar tecla" manda o combo inteiro (ex.: Ctrl + Shift + S) de uma vez. Tem também envio de texto.
 - `touch_controls.ts` + `touch_editor.ts` — controles na tela e editor. **Editar Perfil de Touch** entra direto no modo de edição: o ☰ passa a abrir o menu de edição (criar botão/joystick/drawer/botão especial, propriedades, grade, encaixe, restaurar padrão, descartar) e **Salvar e sair** volta ao menu normal. Na edição há **grade** de 1 a 32 divisões e **ímã** que alinha bordas/centros e encosta controles uns nos outros, com linhas-guia.
 - `pojav_format.ts` lê/grava o **mesmo JSON do PojavLauncher** (v2–v8: `mControlDataList`, `mDrawerDataList`, `mJoystickDataList`, `dynamicX/Y`, códigos GLFW e botões especiais). `keymap.ts` traduz GLFW → teclas do DOM (gerado a partir do `LwjglGlfwKeycode.java` do Pojav).
-- **Layout padrão** (`defaultLayout()` em `touch_controls.ts`; não altera nada do formato do Pojav): quatro drawers no centro inferior — **Mouse**, **Ctrl/Alt**, **Edição**, **Teclas** — e só o botão GUI solto. Fechados não ocupam a tela; um modificador preso (Ctrl/Shift/Alt) deixa o drawer destacado.
-- `input_emulator.ts` — teclado, mouse virtual (botões, ponteiro estilo trackpad com tamanho ajustável, rolagem com dois dedos), eventos de hover (`mouseenter/over/leave/out`, que os menus do Blockbench usam), rolagem real de containers, arrasto de sliders e lista própria para `<select>`.
+- **Layout padrão** = o perfil `Blockbench_1.json` (formato Pojav v8, guardado em `default_layout.ts` e em `android-overlay/default-profile/`): drawers **Mouse**, **Ctrl/Alt**, **Edição** e **Teclas** no centro inferior, sub-botões livres espalhados pela tela e o botão GUI. É o que perfis novos e "Restaurar layout padrão" usam. Para trocar o padrão, substitua o objeto em `default_layout.ts` pelo conteúdo de outro arquivo de controles.
+- `input_emulator.ts` — teclado e mouse virtual. **Com o mouse ativo** (cursor virtual ligado ou algum botão do mouse apertado) um **touchpad** cobre o app, abaixo dos controles e menus: os dedos nunca chegam ao Blockbench e servem só para mover o cursor (relativo), tocar (clique esquerdo no cursor) e rolar (dois dedos); sem isso o Android registrava toque e clique duplicados e dava zoom de pinça. Também emula hover (`mouseenter/over/leave/out`), faz `:hover` (CSS, `matches`, `querySelector`, jQuery) seguir o cursor, rola containers, arrasta sliders e abre lista própria para `<select>`.
+- `file_limits.ts` — **Ignorar limitação de arquivo**: o seletor abre sem filtro de tipo (permite plugins `.js`) e o Blockbench tenta formatos JSON pelo conteúdo quando a extensão é desconhecida.
 - Perfis ficam no `localStorage` do app; exportar/importar usa o seletor nativo de arquivos.
 
 **Keep Alive:** o serviço é `START_NOT_STICKY`, tem `stopWithTask`, para em `onTaskRemoved` e quando a Activity é fechada de verdade (`onDestroy` com `isFinishing`). "Forçar Encerramento" para o serviço, remove a tarefa e mata o processo.
 
-**Tela cheia:** `BlockbenchNative.setFullscreen` esconde as barras do sistema (imersivo, deslizar da borda mostra); `MainActivity` reaplica ao recuperar o foco.
+**Tela cheia / preencher a tela:** `setFullscreen` esconde as barras do sistema (imersivo); `setFillScreen` tira o recuo da janela e usa também a área do recorte da câmera. `MainActivity` reaplica ao recuperar o foco e desliga o zoom de pinça do WebView; o viewport do app é fixo (`user-scalable=no`, `viewport-fit=cover`).
+
+**Menu flutuante deslizável:** opção (desligada por padrão) que permite arrastar o ☰; desligada, ele fica fixo no topo central.
 
 **Forçar Versão de Computador:** grava `bb_android_force_desktop`; um script injetado no `index.html` (por `prepare-www.mjs`) troca o viewport para 1280 px na abertura seguinte. Exige recarregar.
 

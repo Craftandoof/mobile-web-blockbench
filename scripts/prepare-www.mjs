@@ -19,7 +19,9 @@ for (const item of items) {
 // este trecho (executado antes do Blockbench) troca o viewport para uma largura de desktop.
 const indexPath = 'www/index.html';
 let html = fs.readFileSync(indexPath, 'utf8');
-const snippet = `<script>try{if(localStorage.getItem('bb_android_force_desktop')==='1'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1280, initial-scale='+(Math.min(screen.width,screen.height)/1280).toFixed(3)+', user-scalable=no');}}catch(e){}</script>`;
+// viewport fixo: sem zoom de pinça (conflita com os controles de touch) e com viewport-fit=cover (preencher a tela)
+html = html.replace(/(<meta name="viewport" content=")[^"]*(")/i, '$1width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover$2');
+const snippet = `<script>try{if(localStorage.getItem('bb_android_force_desktop')==='1'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1280, initial-scale='+(Math.min(screen.width,screen.height)/1280).toFixed(3)+', maximum-scale='+(Math.min(screen.width,screen.height)/1280).toFixed(3)+', user-scalable=no, viewport-fit=cover');}}catch(e){}</script>`;
 if (!html.includes('bb_android_force_desktop')) {
   html = html.replace(/(<meta name="viewport"[^>]*>)/i, `$1\n\t${snippet}`);
   if (!html.includes('bb_android_force_desktop')) console.warn('viewport meta não encontrado em index.html');

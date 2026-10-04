@@ -120,7 +120,22 @@ public class BlockbenchNativePlugin extends Plugin {
         MainActivity.fullscreen = enabled;
         activity.runOnUiThread(new Runnable() {
             @Override public void run() {
-                MainActivity.applyFullscreen(activity);
+                MainActivity.applyWindowMode(activity);
+                call.resolve();
+            }
+        });
+    }
+
+    /** Preencher a tela inteira: janela sem recuo (recorte da câmera e bordas incluídos). */
+    @PluginMethod
+    public void setFillScreen(final PluginCall call) {
+        final boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+        final Activity activity = getActivity();
+        if (activity == null) { call.reject("Sem Activity"); return; }
+        MainActivity.fillScreen = enabled;
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() {
+                MainActivity.applyWindowMode(activity);
                 call.resolve();
             }
         });

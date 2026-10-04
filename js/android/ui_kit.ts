@@ -112,6 +112,9 @@ const CSS = `
 #bb-android-toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);max-width:88vw;padding:10px 16px;border-radius:20px;background:rgba(20,24,30,.95);border:1px solid var(--color-border,#3a4150);color:#fff;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:100100}
 #bb-android-toast.show{opacity:1}
 #bb-android-vmouse{position:fixed;left:0;top:0;z-index:100200;pointer-events:none;display:none;will-change:transform}
+/* ---------- touchpad (mouse ativo) ---------- */
+#bb-android-touchpad{position:fixed;inset:0;z-index:98000;display:none;touch-action:none;-webkit-user-select:none;user-select:none;background:transparent}
+html.bb-mouse-active,html.bb-mouse-active body{touch-action:none}
 /* ---------- controles na tela ---------- */
 #bb-android-controls{position:fixed;inset:0;pointer-events:none;z-index:99000;touch-action:none}
 .bbc{position:absolute;display:flex;align-items:center;justify-content:center;color:#fff;font:14px/1.1 var(--font-main,Roboto,system-ui,sans-serif);text-align:center;
@@ -140,6 +143,14 @@ export function injectStyle() {
 	document.head.appendChild(st);
 }
 
+// ------------------------------------------------------------------ isolamento de eventos
+
+/** Toques/cliques nos controles e menus do app não devem chegar aos handlers globais do Blockbench (document). */
+export function isolateEvents(el: HTMLElement) {
+	for (const t of ['touchstart', 'touchmove', 'touchend', 'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'wheel'])
+		el.addEventListener(t, e => e.stopPropagation(), { passive: true });
+}
+
 // ------------------------------------------------------------------ raiz (zoom no modo desktop)
 
 let root: HTMLElement | null = null;
@@ -147,6 +158,7 @@ export function getRoot(): HTMLElement {
 	if (root && root.isConnected) return root;
 	root = h('div', { id: 'bb-android-root', class: UI_CLASS });
 	document.body.appendChild(root);
+	isolateEvents(root);
 	applyScale();
 	return root;
 }

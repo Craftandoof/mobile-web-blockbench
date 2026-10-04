@@ -75,6 +75,8 @@ export namespace Filesystem {
 	 * @returns 
 	 */
 	export function importFile(options: ImportOptions, callback?: (files: FileResult[]) => void) {
+		// Android (Capacitor) build: com "ignorar limitação de arquivo" o seletor abre sem filtro de tipo
+		if (!isApp && (window as any).AndroidBridge?.active && (window as any).AndroidBridge.importFile(options, (files: File[]) => readFile(files, options, callback))) return;
 		if (isApp) {
 			let properties = ['openFile'] as any[];
 			if (options.multiple) {

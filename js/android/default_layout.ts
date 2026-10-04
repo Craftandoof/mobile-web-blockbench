@@ -1,0 +1,655 @@
+/**
+ * Perfil de touch PADRÃO do fork Android: o arquivo "Blockbench_1.json" (formato PojavLauncher v8) montado pelo autor.
+ * É o layout usado em perfis novos e em "Restaurar layout padrão". Para trocar o padrão, substitua este objeto
+ * pelo conteúdo de outro arquivo de controles (mesmo formato do Pojav).
+ */
+export const DEFAULT_LAYOUT_JSON: object = {
+	"version": 8,
+	"scaledAt": 100,
+	"mControlDataList": [
+		{
+			"name": "GUI",
+			"dynamicX": "${margin}",
+			"dynamicY": "${bottom} - ${margin}",
+			"width": 56,
+			"height": 42,
+			"isToggle": false,
+			"passThruEnabled": false,
+			"isSwipeable": false,
+			"opacity": 1,
+			"bgColor": 1291845632,
+			"strokeColor": -1,
+			"strokeWidth": 0,
+			"cornerRadius": 0,
+			"displayInGame": true,
+			"displayInMenu": true,
+			"keycodes": [
+				-2,
+				0,
+				0,
+				0
+			]
+		}
+	],
+	"mDrawerDataList": [
+		{
+			"buttonProperties": [
+				{
+					"name": "Esq",
+					"dynamicX": "0.0016129032258064516 * ${screen_width}",
+					"dynamicY": "0.3973384030418251 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-3,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Dir",
+					"dynamicX": "0.0016129032258064516 * ${screen_width}",
+					"dynamicY": "0.6368821292775665 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-4,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Meio",
+					"dynamicX": "0.0016129032258064516 * ${screen_width}",
+					"dynamicY": "0.5570342205323194 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-6,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Rolar ▲",
+					"dynamicX": "0.0016129032258064516 * ${screen_width}",
+					"dynamicY": "0.7167300380228137 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-7,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Rolar ▼",
+					"dynamicX": "0.0016129032258064516 * ${screen_width}",
+					"dynamicY": "0.7965779467680608 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-8,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Ponteiro",
+					"dynamicX": "0.9273348408360635 * ${screen_width} - ${width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-5,
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"properties": {
+				"name": "Mouse",
+				"dynamicX": "0.5 * ${screen_width} - ${width} * 2 - ${margin} * 4.5 + (${width} + ${margin} * 3) * 0",
+				"dynamicY": "${bottom} - ${margin}",
+				"width": 92,
+				"height": 42,
+				"isToggle": false,
+				"passThruEnabled": false,
+				"isSwipeable": false,
+				"opacity": 1,
+				"bgColor": 1291845632,
+				"strokeColor": -1,
+				"strokeWidth": 0,
+				"cornerRadius": 0,
+				"displayInGame": true,
+				"displayInMenu": true,
+				"keycodes": [
+					0,
+					0,
+					0,
+					0
+				]
+			},
+			"orientation": "FREE"
+		},
+		{
+			"buttonProperties": [
+				{
+					"name": "Ctrl",
+					"dynamicX": "0.15 * ${screen_width}",
+					"dynamicY": "0.9391634980988594 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": true,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Shift",
+					"dynamicX": "0.07580645161290323 * ${screen_width}",
+					"dynamicY": "0.9391634980988594 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": true,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						340,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Alt",
+					"dynamicX": "0.22419354838709676 * ${screen_width}",
+					"dynamicY": "0.9391634980988594 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": true,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						342,
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"properties": {
+				"name": "Ctrl/Alt",
+				"dynamicX": "0.5 * ${screen_width} - ${width} * 2 - ${margin} * 4.5 + (${width} + ${margin} * 3) * 1",
+				"dynamicY": "${bottom} - ${margin}",
+				"width": 92,
+				"height": 42,
+				"isToggle": false,
+				"passThruEnabled": false,
+				"isSwipeable": false,
+				"opacity": 1,
+				"bgColor": 1291845632,
+				"strokeColor": -1,
+				"strokeWidth": 0,
+				"cornerRadius": 0,
+				"displayInGame": true,
+				"displayInMenu": true,
+				"keycodes": [
+					0,
+					0,
+					0,
+					0
+				]
+			},
+			"orientation": "FREE"
+		},
+		{
+			"buttonProperties": [
+				{
+					"name": "Desfazer",
+					"dynamicX": "0.15 * ${screen_width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						90,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Refazer",
+					"dynamicX": "0.22419354838709676 * ${screen_width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						89,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Copiar",
+					"dynamicX": "0.07580645161290323 * ${screen_width}",
+					"dynamicY": "0.22703120010433994 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						67,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Colar",
+					"dynamicX": "0.14999999999999997 * ${screen_width}",
+					"dynamicY": "0.22703120010433994 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						86,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Tudo",
+					"dynamicX": "0.22419354838709676 * ${screen_width}",
+					"dynamicY": "0.22703120010433994 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						65,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Salvar",
+					"dynamicX": "0.07580645161290323 * ${screen_width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						341,
+						83,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Excluir",
+					"dynamicX": "0.7047541956747732 * ${screen_width} - ${width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						261,
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"properties": {
+				"name": "Edição",
+				"dynamicX": "0.5 * ${screen_width} - ${width} * 2 - ${margin} * 4.5 + (${width} + ${margin} * 3) * 2",
+				"dynamicY": "${bottom} - ${margin}",
+				"width": 92,
+				"height": 42,
+				"isToggle": false,
+				"passThruEnabled": false,
+				"isSwipeable": false,
+				"opacity": 1,
+				"bgColor": 1291845632,
+				"strokeColor": -1,
+				"strokeWidth": 0,
+				"cornerRadius": 0,
+				"displayInGame": true,
+				"displayInMenu": true,
+				"keycodes": [
+					0,
+					0,
+					0,
+					0
+				]
+			},
+			"orientation": "FREE"
+		},
+		{
+			"buttonProperties": [
+				{
+					"name": "Teclado",
+					"dynamicX": "0.8531412924489667 * ${screen_width} - ${width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						-1,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Esc",
+					"dynamicX": "0.77894774406187 * ${screen_width} - ${width}",
+					"dynamicY": "0.1471832913590928 * ${screen_height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						256,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Tab",
+					"dynamicX": "0.9273348408360635 * ${screen_width} - ${width}",
+					"dynamicY": "0.9068441064638784 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						258,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Enter",
+					"dynamicX": "0.9273348408360635 * ${screen_width} - ${width}",
+					"dynamicY": "0.8269961977186312 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						257,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "Espaço",
+					"dynamicX": "0.9273348408360635 * ${screen_width} - ${width}",
+					"dynamicY": "0.747148288973384 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						32,
+						0,
+						0,
+						0
+					]
+				},
+				{
+					"name": "⌫",
+					"dynamicX": "0.9273348408360635 * ${screen_width} - ${width}",
+					"dynamicY": "0.6673003802281369 * ${screen_height} - ${height}",
+					"width": 92,
+					"height": 42,
+					"isToggle": false,
+					"passThruEnabled": false,
+					"isSwipeable": false,
+					"opacity": 1,
+					"bgColor": 1291845632,
+					"strokeColor": -1,
+					"strokeWidth": 0,
+					"cornerRadius": 0,
+					"displayInGame": true,
+					"displayInMenu": true,
+					"keycodes": [
+						259,
+						0,
+						0,
+						0
+					]
+				}
+			],
+			"properties": {
+				"name": "Teclas",
+				"dynamicX": "0.5 * ${screen_width} - ${width} * 2 - ${margin} * 4.5 + (${width} + ${margin} * 3) * 3",
+				"dynamicY": "${bottom} - ${margin}",
+				"width": 92,
+				"height": 42,
+				"isToggle": false,
+				"passThruEnabled": false,
+				"isSwipeable": false,
+				"opacity": 1,
+				"bgColor": 1291845632,
+				"strokeColor": -1,
+				"strokeWidth": 0,
+				"cornerRadius": 0,
+				"displayInGame": true,
+				"displayInMenu": true,
+				"keycodes": [
+					0,
+					0,
+					0,
+					0
+				]
+			},
+			"orientation": "FREE"
+		}
+	],
+	"mJoystickDataList": []
+};

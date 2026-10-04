@@ -7,6 +7,7 @@
  */
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { initAndroidUi } from './android_menu';
+import { ignoreFileLimits, pickAnyFile } from './file_limits';
 
 let isNative = false;
 let Native: any = null;
@@ -69,7 +70,7 @@ export const AndroidBridge = {
 
 		let name: string = options.name || 'file';
 		const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
-		if (options.extensions instanceof Array && options.extensions[0] && !options.extensions.includes(ext)) {
+		if (!ignoreFileLimits() && options.extensions instanceof Array && options.extensions[0] && !options.extensions.includes(ext)) {
 			name += '.' + options.extensions[0];
 		}
 		(async () => {
@@ -85,6 +86,16 @@ export const AndroidBridge = {
 				(window as any).Blockbench?.showQuickMessage?.('Save failed: ' + (err?.message || err), 4000);
 			}
 		})();
+		return true;
+	},
+
+	/** True quando a opção "Ignorar limitação de arquivo" está ligada. */
+	ignoreFileLimits(): boolean { return isNative && ignoreFileLimits(); },
+
+	/** Seletor sem filtro de tipo. Devolve true se tratou a importação; false deixa o Blockbench usar o dele. */
+	importFile(options: any, cb: (files: File[]) => void): boolean {
+		if (!isNative || !ignoreFileLimits()) return false;
+		pickAnyFile(options?.multiple === true, cb);
 		return true;
 	},
 
@@ -106,6 +117,11 @@ export const AndroidBridge = {
 			return;
 		}
 		await Native.setFullscreen({ enabled: on });
+	},
+	/** Desenha também sob o recorte da câmera e as bordas (sem a faixa preta). */
+	async setFillScreen(on: boolean) {
+		if (!isNative) return;
+		await Native.setFillScreen({ enabled: on });
 	},
 	/** Para o serviço Keep Alive, fecha a Activity e encerra o processo. */
 	async forceQuit() {
@@ -143,6 +159,7 @@ if (isNative) try {
 		keepAliveEnabled: () => AndroidBridge.keepAliveEnabled(),
 		setKeepAlive: enabled => AndroidBridge.setKeepAlive(enabled),
 		setFullscreen: on => AndroidBridge.setFullscreen(on),
+		setFillScreen: on => AndroidBridge.setFillScreen(on),
 		forceQuit: () => AndroidBridge.forceQuit(),
 		flush,
 	});

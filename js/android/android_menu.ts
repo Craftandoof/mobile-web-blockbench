@@ -4,6 +4,7 @@ import * as Input from './input_emulator';
 import { UI_CLASS } from './input_emulator';
 import { startEditing, openEditMenu, openProfilesDrawer } from './touch_editor';
 import { openSendKeyboard } from './send_keyboard';
+import { ignoreFileLimits, setIgnoreFileLimits } from './file_limits';
 import {
 	h, Store, injectStyle, getRoot, applyScale, uiScale, openDrawer, closeAll, drawerCount, focusDrawer,
 	item, section, hint, slider, toggleItem, toast, confirmDialog, pickSelectOption,
@@ -14,6 +15,7 @@ export interface MenuHost {
 	keepAliveEnabled(): boolean;
 	setKeepAlive(on: boolean): Promise<void>;
 	setFullscreen(on: boolean): Promise<void>;
+	setFillScreen(on: boolean): Promise<void>;
 	forceQuit(): Promise<void>;
 	flush(): void;
 }
@@ -39,8 +41,9 @@ function applyFabSize() {
 
 type FabPos = { x: number; y: number } | null;
 /** Posição guardada como fração da tela (centro do botão), para sobreviver a rotação/resize. */
+const fabDraggable = () => Store.get<boolean>('fab_draggable', false);
 function applyFabPos() {
-	const pos = Store.get<FabPos>('fab_pos', null);
+	const pos = fabDraggable() ? Store.get<FabPos>('fab_pos', null) : null;
 	if (!pos) { fab.style.left = ''; fab.style.top = ''; fab.style.transform = ''; return; }
 	const u = uiScale(), half = (fabSizePx() * u) / 2;
 	const cx = Math.max(half, Math.min(window.innerWidth - half, pos.x * window.innerWidth));
@@ -60,6 +63,7 @@ function setupFabDrag() {
 	let drag: { id: number; sx: number; sy: number; moved: boolean } | null = null;
 	let suppress = false;
 	fab.addEventListener('pointerdown', e => {
+		if (!fabDraggable()) return;
 		drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
 		try { fab.setPointerCapture(e.pointerId); } catch { /* ok */ }
 	});
@@ -131,7 +135,12 @@ function openSettings() {
 				min: 30, max: 150, value: Store.get<number>('fab_size', 100), format: v => v + '%',
 				onInput: v => { Store.set('fab_size', v); applyFabSize(); },
 			}),
-			item('Restaurar posição do menu flutuante', () => { Store.remove('fab_pos'); applyFabPos(); toast('Menu flutuante de volta ao topo central'); }, { icon: '⌖', hint: 'Arraste o botão ☰ para qualquer lugar da tela' }),
+			toggleItem('Menu flutuante deslizável', {
+				value: fabDraggable(),
+				hint: 'Permite arrastar o botão ☰ para qualquer lugar da tela. Desligado, ele fica fixo no topo central',
+				onChange: on => { Store.set('fab_draggable', on); applyFabPos(); draw(); },
+			}),
+			...(fabDraggable() ? [item('Restaurar posição do menu flutuante', () => { Store.remove('fab_pos'); applyFabPos(); toast('Menu flutuante de volta ao topo central'); }, { icon: '⌖' })] : []),
 
 			section('Mouse virtual'),
 			slider('Tamanho do Mouse', {
@@ -158,6 +167,14 @@ function openSettings() {
 					try { await host.setFullscreen(on); } catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
 				},
 			}),
+			toggleItem('Preencher a tela inteira', {
+				value: Store.get<boolean>('fill_screen', false),
+				hint: 'Usa também a área do recorte da câmera (notch) e das bordas, sem a faixa preta. Algum botão do Blockbench pode ficar sob a câmera',
+				onChange: async on => {
+					Store.set('fill_screen', on);
+					try { await host.setFillScreen(on); } catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+				},
+			}),
 			toggleItem('Forçar Versão de Computador (Web)', {
 				value: isForceDesktop(),
 				hint: 'Usa o layout de desktop do Blockbench em vez do layout para celular',
@@ -171,6 +188,13 @@ function openSettings() {
 					if (ok) { try { host.flush(); } catch { /* ok */ } setTimeout(() => location.reload(), 500); }
 					else toast('Será aplicado na próxima abertura', 3000);
 				},
+			}),
+
+			section('Arquivos'),
+			toggleItem('Ignorar limitação de arquivo', {
+				value: ignoreFileLimits(),
+				hint: 'O seletor lista qualquer tipo de arquivo e o Blockbench deixa de exigir a extensão esperada (.bbmodel, .js dos plugins etc.)',
+				onChange: on => { setIgnoreFileLimits(on); toast(on ? 'Limitação de arquivo ignorada' : 'Limitação de arquivo restaurada'); },
 			}),
 
 			section('Controles de touch'),
@@ -208,6 +232,7 @@ export function initAndroidUi(h_: MenuHost) {
 		Controls.init();
 		// tela cheia: reaplica ao voltar para o app (o Android pode ter mostrado as barras)
 		if (Store.get<boolean>('fullscreen', false)) host.setFullscreen(true).catch(() => { /* sem suporte */ });
+		if (Store.get<boolean>('fill_screen', false)) host.setFillScreen(true).catch(() => { /* sem suporte */ });
 		document.addEventListener('visibilitychange', () => {
 			if (document.visibilityState === 'visible' && Store.get<boolean>('fullscreen', false)) host.setFullscreen(true).catch(() => { /* ok */ });
 		});
