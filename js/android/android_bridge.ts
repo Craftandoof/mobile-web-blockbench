@@ -96,6 +96,17 @@ export const AndroidBridge = {
 	keepAliveEnabled(): boolean {
 		return localStorage.getItem('bb_android_keepalive') !== '0';
 	},
+	/** Tela cheia imersiva do Android (esconde barra de status e de navegação). */
+	async setFullscreen(on: boolean) {
+		if (!isNative) {
+			try {
+				if (on) await document.documentElement.requestFullscreen();
+				else if (document.fullscreenElement) await document.exitFullscreen();
+			} catch { /* o navegador pode exigir gesto do usuário */ }
+			return;
+		}
+		await Native.setFullscreen({ enabled: on });
+	},
 	/** Para o serviço Keep Alive, fecha a Activity e encerra o processo. */
 	async forceQuit() {
 		if (!isNative) { window.close(); return; }
@@ -131,6 +142,7 @@ if (isNative) try {
 		isNative,
 		keepAliveEnabled: () => AndroidBridge.keepAliveEnabled(),
 		setKeepAlive: enabled => AndroidBridge.setKeepAlive(enabled),
+		setFullscreen: on => AndroidBridge.setFullscreen(on),
 		forceQuit: () => AndroidBridge.forceQuit(),
 		flush,
 	});

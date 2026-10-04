@@ -7,6 +7,13 @@
 import { KEY_BY_GLFW, KEYS } from './keymap';
 
 export const UI_CLASS = 'bb-android-ui';
+
+/** CSS px por dp. 1 no normal; >1 quando o viewport é forçado a ser largo (modo desktop). */
+export function uiScale(): number {
+	const sw = (typeof screen !== 'undefined' && screen.width) || window.innerWidth;
+	const u = window.innerWidth / sw;
+	return u > 1.15 ? u : 1;
+}
 export const isUi = (t: any): boolean => !!(t && t.closest && t.closest('.' + UI_CLASS));
 
 // ------------------------------------------------------------------ teclado
@@ -150,6 +157,8 @@ export const Mouse = {
 	buttons: 0,
 	virtual: false,
 	sensitivity: 1.4,
+	/** multiplicador do tamanho do cursor virtual (0.25 – 1.5) */
+	size: 1,
 };
 let downAt: Record<string, { x: number; y: number; t: number }> = {};
 let lastClick = { t: 0, x: 0, y: 0 };
@@ -161,10 +170,12 @@ function pointTarget(): Element {
 	return document.body;
 }
 
+let moveDX = 0, moveDY = 0;
 function fire(type: string, target: Element, button: number, extra: any = {}) {
 	const init: any = {
 		bubbles: true, cancelable: true, composed: true, view: window,
 		clientX: Mouse.x, clientY: Mouse.y, screenX: Mouse.x, screenY: Mouse.y,
+		movementX: moveDX, movementY: moveDY,
 		button, buttons: Mouse.buttons, ...currentMods(), ...extra,
 	};
 	let ev: Event;
@@ -182,7 +193,12 @@ function fire(type: string, target: Element, button: number, extra: any = {}) {
 function updateCursor() {
 	if (!cursorEl) return;
 	cursorEl.style.display = Mouse.virtual ? 'block' : 'none';
-	cursorEl.style.transform = `translate(${Mouse.x}px, ${Mouse.y}px)`;
+	cursorEl.style.transformOrigin = '0 0';
+	cursorEl.style.transform = `translate(${Mouse.x}px, ${Mouse.y}px) scale(${Mouse.size * uiScale()})`;
+}
+export function setMouseSize(size: number) {
+	Mouse.size = Math.max(0.25, Math.min(1.5, size));
+	updateCursor();
 }
 function ensureCursor() {
 	if (cursorEl || typeof document === 'undefined') return;
@@ -194,25 +210,79 @@ function ensureCursor() {
 	updateCursor();
 }
 
+let hoverEl: Element | null = null;
+
+/** Dispara over/enter/out/leave como um mouse de verdade (os menus do Blockbench abrem por mouseenter/mouseover). */
+function updateHover(next: Element | null) {
+	const prev = hoverEl;
+	if (prev === next) return;
+	hoverEl = next;
+	const chain = (el: Element | null) => { const a: Element[] = []; for (let n = el; n; n = n.parentElement) a.push(n); return a; };
+	const prevChain = chain(prev), nextChain = chain(next);
+	if (prev) {
+		fire('pointerout', prev, -1, { relatedTarget: next });
+		fire('mouseout', prev, 0, { relatedTarget: next });
+		for (const el of prevChain) if (!nextChain.includes(el)) {
+			fire('pointerleave', el, -1, { bubbles: false, relatedTarget: next });
+			fire('mouseleave', el, 0, { bubbles: false, relatedTarget: next });
+		}
+	}
+	if (next) {
+		fire('pointerover', next, -1, { relatedTarget: prev });
+		fire('mouseover', next, 0, { relatedTarget: prev });
+		for (const el of nextChain.slice().reverse()) if (!prevChain.includes(el)) {
+			fire('pointerenter', el, -1, { bubbles: false, relatedTarget: prev });
+			fire('mouseenter', el, 0, { bubbles: false, relatedTarget: prev });
+		}
+	}
+}
+
 export function moveTo(x: number, y: number) {
-	Mouse.x = Math.max(0, Math.min(window.innerWidth - 1, x));
-	Mouse.y = Math.max(0, Math.min(window.innerHeight - 1, y));
+	const nx = Math.max(0, Math.min(window.innerWidth - 1, x)), ny = Math.max(0, Math.min(window.innerHeight - 1, y));
+	moveDX = nx - Mouse.x; moveDY = ny - Mouse.y;
+	Mouse.x = nx; Mouse.y = ny;
 	updateCursor();
 	const t = pointTarget();
+	updateHover(t);
 	fire('pointermove', t, -1);
 	fire('mousemove', t, 0);
+	if (rangeDrag) setRangeFromPointer(rangeDrag);
+	moveDX = moveDY = 0;
 }
 export function moveBy(dx: number, dy: number) { moveTo(Mouse.x + dx, Mouse.y + dy); }
+
+const FOCUSABLE = 'input,textarea,select,button,a[href],[tabindex],[contenteditable=""],[contenteditable="true"]';
+let rangeDrag: HTMLInputElement | null = null;
+
+function setRangeFromPointer(el: HTMLInputElement) {
+	const r = el.getBoundingClientRect();
+	if (!r.width) return;
+	const min = Number(el.min || 0), max = Number(el.max || 100), step = Number(el.step || 1) || 1;
+	let v = min + Math.max(0, Math.min(1, (Mouse.x - r.left) / r.width)) * (max - min);
+	v = Math.round((v - min) / step) * step + min;
+	const next = String(Math.max(min, Math.min(max, v)));
+	if (el.value !== next) {
+		el.value = next;
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+	}
+}
 
 export function mouseDown(btn: MouseBtn) {
 	if (Mouse.buttons & BTN_MASK[btn]) return;
 	const t = pointTarget();
-	const active = document.activeElement as HTMLElement | null;
-	if (active && active !== document.body && isEditable(active) && !active.contains(t)) active.blur();
+	updateHover(t);
 	Mouse.buttons |= BTN_MASK[btn];
 	downAt[btn] = { x: Mouse.x, y: Mouse.y, t: Date.now() };
 	fire('pointerdown', t, BTN_INDEX[btn]);
-	fire('mousedown', t, BTN_INDEX[btn]);
+	const md = fire('mousedown', t, BTN_INDEX[btn]);
+	// o mousedown sintético não move o foco nem arrasta controles nativos: faz isso à mão
+	if (btn === 'left' && !md.defaultPrevented) {
+		const f = (t.closest && t.closest(FOCUSABLE)) as HTMLElement | null;
+		const active = document.activeElement as HTMLElement | null;
+		if (f && f !== active) { try { f.focus({ preventScroll: true }); } catch { /* ok */ } }
+		else if (!f && active && active !== document.body && isEditable(active)) active.blur();
+		if (f && f.tagName === 'INPUT' && (f as HTMLInputElement).type === 'range') { rangeDrag = f as HTMLInputElement; setRangeFromPointer(rangeDrag); }
+	}
 }
 export function mouseUp(btn: MouseBtn) {
 	if (!(Mouse.buttons & BTN_MASK[btn])) return;
@@ -220,25 +290,49 @@ export function mouseUp(btn: MouseBtn) {
 	Mouse.buttons &= ~BTN_MASK[btn];
 	fire('pointerup', t, BTN_INDEX[btn]);
 	fire('mouseup', t, BTN_INDEX[btn]);
+	if (btn === 'left' && rangeDrag) { rangeDrag.dispatchEvent(new Event('change', { bubbles: true })); rangeDrag = null; }
 	const d = downAt[btn];
 	const still = d && Math.hypot(Mouse.x - d.x, Mouse.y - d.y) < 8;
 	if (still) {
 		if (btn === 'left') {
-			fire('click', t, 0);
 			const now = Date.now();
-			if (now - lastClick.t < 350 && Math.hypot(Mouse.x - lastClick.x, Mouse.y - lastClick.y) < 12) {
-				fire('dblclick', t, 0);
-				lastClick = { t: 0, x: 0, y: 0 };
-			} else lastClick = { t: now, x: Mouse.x, y: Mouse.y };
+			const dbl = now - lastClick.t < 350 && Math.hypot(Mouse.x - lastClick.x, Mouse.y - lastClick.y) < 12;
+			const ck = fire('click', t, 0, { detail: dbl ? 2 : 1 });
+			const sel = t.closest && t.closest('select') as HTMLSelectElement | null;
+			if (sel && !sel.disabled && !ck.defaultPrevented) document.dispatchEvent(new CustomEvent('bb-android-select', { detail: sel }));
+			if (dbl) { fire('dblclick', t, 0, { detail: 2 }); lastClick = { t: 0, x: 0, y: 0 }; }
+			else lastClick = { t: now, x: Mouse.x, y: Mouse.y };
 		} else if (btn === 'right') fire('contextmenu', t, 2);
 		else fire('auxclick', t, 1);
 	}
 }
 export function click(btn: MouseBtn = 'left') { mouseDown(btn); mouseUp(btn); }
-export function wheel(deltaY: number) { fire('wheel', pointTarget(), 0, { deltaY, deltaX: 0, deltaMode: 0 }); }
+function canScroll(el: Element, dy: number, dx: number): boolean {
+	const cs = getComputedStyle(el);
+	const oy = /(auto|scroll|overlay)/.test(cs.overflowY), ox = /(auto|scroll|overlay)/.test(cs.overflowX);
+	if (dy && oy && el.scrollHeight > el.clientHeight + 1) {
+		if (dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return true;
+	}
+	if (dx && ox && el.scrollWidth > el.clientWidth + 1) {
+		if (dx < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1) return true;
+	}
+	return false;
+}
+
+/** Roda o scroll: dispara o evento wheel (apps que tratam a roda) e, se ninguém tratou, rola o container (o wheel sintético não rola sozinho). */
+export function wheel(deltaY: number, deltaX = 0) {
+	const t = pointTarget();
+	if (currentMods().shiftKey && !deltaX) { deltaX = deltaY; deltaY = 0; }
+	const ev = fire('wheel', t, 0, { deltaY, deltaX, deltaMode: 0 });
+	if (ev.defaultPrevented) return;
+	for (let el: Element | null = t; el; el = el.parentElement) {
+		if (canScroll(el, deltaY, deltaX)) { el.scrollTop += deltaY; el.scrollLeft += deltaX; return; }
+	}
+}
 
 export function setVirtualMouse(on: boolean) {
 	Mouse.virtual = on;
+	if (!on) updateHover(null);
 	ensureCursor();
 	updateCursor();
 	document.dispatchEvent(new CustomEvent('bb-android-vmouse', { detail: on }));
@@ -249,6 +343,7 @@ export const toggleVirtualMouse = () => setVirtualMouse(!Mouse.virtual);
 
 const blockedPointers = new Set<number>();
 const blockedTouches = new Set<number>();
+let scrollY: number | null = null;
 let track: { id: number; sx: number; sy: number; lx: number; ly: number; t0: number; moved: boolean } | null = null;
 
 const intercepting = () => Mouse.virtual || Mouse.buttons !== 0;
@@ -283,6 +378,15 @@ function onTouch(e: TouchEvent) {
 	const mine = Array.from(e.changedTouches).filter(ch => blockedTouches.has(ch.identifier));
 	if (!mine.length) return;
 	stop(e);
+	// dois dedos = rolagem (como no trackpad)
+	if (e.type === 'touchmove' && e.touches.length >= 2 && Mouse.virtual) {
+		const y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+		if (scrollY !== null) wheel(scrollY - y);
+		scrollY = y;
+		if (track) track.moved = true;
+		return;
+	}
+	if (e.touches.length < 2) scrollY = null;
 	const t = track && mine.find(ch => ch.identifier === track!.id);
 	if (e.type === 'touchmove' && t && track) {
 		const dx = t.clientX - track.lx, dy = t.clientY - track.ly;

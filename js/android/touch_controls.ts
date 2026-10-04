@@ -31,30 +31,43 @@ const MARGIN_DP = 2;
 
 // ------------------------------------------------------------------ layout padrão (modelo Blockbench)
 
+/**
+ * Layout padrão do fork: quatro drawers no centro inferior, cada um agrupa um tipo de botão.
+ * Fechado, o drawer não ocupa a tela; o usuário abre só o que está usando.
+ * (O formato e o comportamento dos controles continuam idênticos ao do Pojav; muda só este arquivo padrão.)
+ */
 export function defaultLayout(): Layout {
 	const L = newLayout();
-	const key = (name: string, keys: number[], x: string, y: string, extra: Partial<ControlData> = {}) =>
-		L.mControlDataList.push(newControl({ name, keycodes: keys, dynamicX: x, dynamicY: y, ...extra }));
-	const bottom = '${bottom} - ${margin}';
-	key('Ctrl', [341], '${margin}', bottom, { isToggle: true });
-	key('Shift', [340], '${margin} * 2 + ${width}', bottom, { isToggle: true });
-	key('Alt', [342], '${margin} * 3 + ${width} * 2', bottom, { isToggle: true });
-	key('Undo', [341, 90], '${right} - ${margin} - ${width}', bottom);
-	key('Redo', [341, 89], '${right}', bottom);
-	key('Del', [261], '${right}', '${bottom} - ${margin} * 2 - ${height}');
-	L.mControlDataList.push(specialButton(SPECIAL.MOUSEPRI, '${margin}', '${screen_height} * 0.5 - ${height} - ${margin}'));
-	L.mControlDataList.push(specialButton(SPECIAL.MOUSESEC, '${margin}', '${screen_height} * 0.5 + ${margin}'));
-	L.mControlDataList.push(specialButton(SPECIAL.MOUSEMID, '${margin}', '${screen_height} * 0.5 + ${height} + ${margin} * 3'));
-	L.mControlDataList.push(specialButton(SPECIAL.SCROLLUP, '${right}', '${screen_height} * 0.5 - ${height} - ${margin}'));
-	L.mControlDataList.push(specialButton(SPECIAL.SCROLLDOWN, '${right}', '${screen_height} * 0.5 + ${margin}'));
-	L.mControlDataList.push(specialButton(SPECIAL.KEYBOARD, '${margin}', '${margin}'));
-	L.mControlDataList.push(specialButton(SPECIAL.TOGGLECTRL, '${margin} * 2 + 80', '${margin}', ));
-	L.mControlDataList.push(specialButton(SPECIAL.VIRTUALMOUSE, '${right}', '${margin}'));
-	const d = newDrawer({ name: 'Editar', dynamicX: '${screen_width} * 0.5 - ${width} / 2', dynamicY: '${bottom} - ${margin}' });
-	d.orientation = 'UP';
-	const sub = (name: string, keys: number[]) => d.buttonProperties.push(newControl({ name, keycodes: keys }));
-	sub('Copiar', [341, 67]); sub('Colar', [341, 86]); sub('Tudo', [341, 65]); sub('Salvar', [341, 83]);
-	L.mDrawerDataList.push(d);
+	const key = (name: string, keys: number[], extra: Partial<ControlData> = {}) => newControl({ name, keycodes: keys, ...extra });
+	const groups: { name: string; subs: ControlData[] }[] = [
+		{ name: 'Mouse', subs: [
+			key('Esq', [SPECIAL.MOUSEPRI]), key('Dir', [SPECIAL.MOUSESEC]), key('Meio', [SPECIAL.MOUSEMID]),
+			key('Rolar ▲', [SPECIAL.SCROLLUP]), key('Rolar ▼', [SPECIAL.SCROLLDOWN]), key('Ponteiro', [SPECIAL.VIRTUALMOUSE]),
+		] },
+		{ name: 'Ctrl/Alt', subs: [
+			key('Ctrl', [341], { isToggle: true }), key('Shift', [340], { isToggle: true }), key('Alt', [342], { isToggle: true }),
+		] },
+		{ name: 'Edição', subs: [
+			key('Desfazer', [341, 90]), key('Refazer', [341, 89]), key('Copiar', [341, 67]), key('Colar', [341, 86]),
+			key('Tudo', [341, 65]), key('Salvar', [341, 83]), key('Excluir', [261]),
+		] },
+		{ name: 'Teclas', subs: [
+			key('Teclado', [SPECIAL.KEYBOARD]), key('Esc', [256]), key('Tab', [258]), key('Enter', [257]),
+			key('Espaço', [32]), key('⌫', [259]),
+		] },
+	];
+	const n = groups.length;
+	groups.forEach((g, i) => {
+		const x = `0.5 * \${screen_width} - \${width} * ${n / 2} - \${margin} * ${(n - 1) * 1.5} + (\${width} + \${margin} * 3) * ${i}`;
+		const d = newDrawer({ name: g.name, dynamicX: x, dynamicY: '${bottom} - ${margin}', width: 92, height: 42 });
+		d.orientation = 'UP';
+		d.buttonProperties = g.subs.map(c => { c.width = 92; c.height = 42; return c; });
+		L.mDrawerDataList.push(d);
+	});
+	// único botão solto: mostrar/ocultar todos os controles
+	L.mControlDataList.push(newControl({
+		name: 'GUI', keycodes: [SPECIAL.TOGGLECTRL], dynamicX: '${margin}', dynamicY: '${bottom} - ${margin}', width: 56, height: 42,
+	}));
 	return L;
 }
 
@@ -72,6 +85,12 @@ const state = {
 	editing: false,
 	visible: true,
 	selected: null as Item | null,
+	snapshot: null as Layout | null,
+	gridEl: null as HTMLElement | null,
+	guidesEl: null as HTMLElement | null,
+	grid: 1,          // divisões da tela por eixo (1 = sem grade)
+	showGrid: true,
+	magnet: true,
 	listeners: new Set<() => void>(),
 	onMenu: null as null | (() => void),
 	started: false,
@@ -148,7 +167,8 @@ function applyStyle(it: Item) {
 	if (it.kind !== 'joystick') {
 		it.el.firstChild && it.el.firstChild.nodeType === 3 ? (it.el.firstChild.textContent = d.name) : it.el.prepend(document.createTextNode(d.name));
 	}
-	it.el.classList.toggle('toggled', it.toggled && d.isToggle);
+	const childOn = it.kind === 'drawer' && it.subs.some(sb => sb.toggled && sb.data.isToggle);
+	it.el.classList.toggle('toggled', (it.toggled && d.isToggle) || childOn);
 	it.el.classList.toggle('active', it.pressed && !d.isToggle);
 }
 
@@ -185,6 +205,118 @@ function applyVisibility(it: Item) {
 	it.el.classList.toggle('selected', state.selected === it);
 }
 
+
+// ------------------------------------------------------------------ grade e encaixe (edição)
+
+const SNAP_PX = 10;      // distância do ímã (CSS px × escala)
+const SNAP_GAP = 4;      // espaço entre controles que se encaixam lado a lado
+
+function drawGrid() {
+	const g = state.gridEl;
+	if (!g) return;
+	const n = state.grid;
+	const on = state.editing && state.showGrid && n > 1;
+	g.classList.toggle('on', on);
+	if (!on) return;
+	const w = window.innerWidth / n, hh = window.innerHeight / n;
+	g.style.backgroundImage = 'linear-gradient(to right, rgba(255,255,255,.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.22) 1px, transparent 1px)';
+	g.style.backgroundSize = `${w}px ${hh}px`;
+}
+
+function showGuides(vx: number[], hy: number[]) {
+	const el = state.guidesEl;
+	if (!el) return;
+	el.replaceChildren(
+		...vx.map(x => h('div', { style: `left:${x}px;top:0;width:1px;height:100%` })),
+		...hy.map(y => h('div', { style: `top:${y}px;left:0;height:1px;width:100%` })),
+	);
+}
+const clearGuides = () => state.guidesEl?.replaceChildren();
+
+/** Controles visíveis que servem de referência para o ímã (exclui o próprio e, se for drawer, os sub-botões dele). */
+function snapTargets(self: Item) {
+	return state.items.filter(o => o !== self && o.owner !== self && !o.el.classList.contains('hidden') && o.rect.w > 0);
+}
+
+/** Melhor encaixe de um conjunto de bordas em candidatos; devolve o deslocamento e a linha-guia. */
+function bestSnap(edges: number[], cands: { v: number; guide: number }[], thr: number) {
+	let best: { off: number; guide: number } | null = null;
+	for (const e of edges) for (const c of cands) {
+		const off = c.v - e;
+		if (Math.abs(off) <= thr && (!best || Math.abs(off) < Math.abs(best.off))) best = { off, guide: c.guide };
+	}
+	return best;
+}
+
+/** Posição com ímã nos outros controles (alinhar bordas/centros e encostar com folga) e, depois, grade. */
+export function snapPosition(self: Item, x: number, y: number, w: number, hh: number) {
+	const U = metrics().U, thr = SNAP_PX * U, gap = SNAP_GAP * U;
+	const W = window.innerWidth, H = window.innerHeight;
+	const xs: { v: number; guide: number }[] = [{ v: 0, guide: 0 }, { v: W, guide: W }, { v: W / 2, guide: W / 2 }];
+	const ys: { v: number; guide: number }[] = [{ v: 0, guide: 0 }, { v: H, guide: H }, { v: H / 2, guide: H / 2 }];
+	let vx: number[] = [], hy: number[] = [];
+	let snappedX = false, snappedY = false;
+	if (state.magnet) {
+		for (const o of snapTargets(self)) {
+			const r = o.rect;
+			xs.push({ v: r.x, guide: r.x }, { v: r.x + r.w, guide: r.x + r.w }, { v: r.x + r.w / 2, guide: r.x + r.w / 2 });
+			ys.push({ v: r.y, guide: r.y }, { v: r.y + r.h, guide: r.y + r.h }, { v: r.y + r.h / 2, guide: r.y + r.h / 2 });
+		}
+		const bx = bestSnap([x, x + w / 2, x + w], xs, thr);
+		// encostar: borda esquerda logo depois da direita do vizinho, e vice-versa
+		const adjX: { v: number; guide: number }[] = [], adjY: { v: number; guide: number }[] = [];
+		for (const o of snapTargets(self)) {
+			const r = o.rect;
+			const overlapY = y < r.y + r.h && y + hh > r.y, overlapX = x < r.x + r.w && x + w > r.x;
+			if (overlapY || Math.abs(y - r.y) < hh) { adjX.push({ v: r.x + r.w + gap, guide: r.x + r.w + gap / 2 }); adjX.push({ v: r.x - gap - w, guide: r.x - gap / 2 }); }
+			if (overlapX || Math.abs(x - r.x) < w) { adjY.push({ v: r.y + r.h + gap, guide: r.y + r.h + gap / 2 }); adjY.push({ v: r.y - gap - hh, guide: r.y - gap / 2 }); }
+		}
+		const ax = bestSnap([x], adjX, thr), ay = bestSnap([y], adjY, thr);
+		const by = bestSnap([y, y + hh / 2, y + hh], ys, thr);
+		const pickX = [bx, ax].filter(Boolean).sort((p, q) => Math.abs(p!.off) - Math.abs(q!.off))[0];
+		const pickY = [by, ay].filter(Boolean).sort((p, q) => Math.abs(p!.off) - Math.abs(q!.off))[0];
+		if (pickX) { x += pickX.off; vx = [pickX.guide]; snappedX = true; }
+		if (pickY) { y += pickY.off; hy = [pickY.guide]; snappedY = true; }
+	}
+	if (state.grid > 1) {
+		const cw = W / state.grid, ch = H / state.grid;
+		if (!snappedX) x = Math.round(x / cw) * cw;
+		if (!snappedY) y = Math.round(y / ch) * ch;
+	}
+	showGuides(vx, hy);
+	return { x, y };
+}
+
+/** Tamanho com ímã na borda direita/inferior e na grade. */
+export function snapSize(self: Item, w: number, hh: number) {
+	const U = metrics().U, thr = SNAP_PX * U;
+	const W = window.innerWidth, H = window.innerHeight;
+	const right = self.rect.x + w, bottom = self.rect.y + hh;
+	let vx: number[] = [], hy: number[] = [];
+	let sx = false, sy = false;
+	if (state.magnet) {
+		const xs: { v: number; guide: number }[] = [{ v: W, guide: W }], ys: { v: number; guide: number }[] = [{ v: H, guide: H }];
+		for (const o of snapTargets(self)) {
+			const r = o.rect;
+			xs.push({ v: r.x, guide: r.x }, { v: r.x + r.w, guide: r.x + r.w });
+			ys.push({ v: r.y, guide: r.y }, { v: r.y + r.h, guide: r.y + r.h });
+			// mesma largura / altura de um vizinho
+			xs.push({ v: self.rect.x + r.w, guide: self.rect.x + r.w });
+			ys.push({ v: self.rect.y + r.h, guide: self.rect.y + r.h });
+		}
+		const bx = bestSnap([right], xs, thr), by = bestSnap([bottom], ys, thr);
+		if (bx) { w += bx.off; vx = [bx.guide]; sx = true; }
+		if (by) { hh += by.off; hy = [by.guide]; sy = true; }
+	}
+	if (state.grid > 1) {
+		const cw = W / state.grid, ch = H / state.grid;
+		if (!sx) w = Math.max(cw / 2, Math.round(w / cw) * cw);
+		if (!sy) hh = Math.max(ch / 2, Math.round(hh / ch) * ch);
+	}
+	showGuides(vx, hy);
+	return { w, h: hh };
+}
+
 // ------------------------------------------------------------------ montagem dos itens
 
 function makeItem(kind: Kind, data: ControlData, extra: Partial<Item> = {}): Item {
@@ -200,6 +332,8 @@ function build() {
 	const L = state.layout!;
 	state.items = [];
 	state.root!.replaceChildren();
+	if (state.gridEl) state.root!.append(state.gridEl);
+	if (state.guidesEl) state.root!.append(state.guidesEl);
 	for (const d of L.mControlDataList) state.items.push(makeItem('button', d));
 	for (const j of L.mJoystickDataList) state.items.push(makeItem('joystick', j));
 	for (const dr of L.mDrawerDataList) {
@@ -213,6 +347,7 @@ function build() {
 		}
 	}
 	for (const it of state.items) state.root!.append(it.el);
+	if (state.guidesEl) state.root!.append(state.guidesEl);
 	placeAll();
 	if (state.selected && !state.items.some(i => i.data === state.selected!.data)) state.selected = null;
 	else if (state.selected) state.selected = state.items.find(i => i.data === state.selected!.data) || null;
@@ -246,6 +381,7 @@ function flipToggle(it: Item): boolean {
 	it.toggled = !it.toggled;
 	it.el.classList.toggle('toggled', it.toggled);
 	sendKeys(it, it.toggled);
+	if (it.owner) applyStyle(it.owner);
 	return true;
 }
 
@@ -323,7 +459,10 @@ function bind(it: Item) {
 		if (!rsz || e.pointerId !== rsz.pid) return;
 		const { U } = metrics();
 		const f = scaleFactor();
-		const nw = Math.max(20, rsz.w + (e.clientX - rsz.sx)), nh = Math.max(20, rsz.h + (e.clientY - rsz.sy));
+		let nw = Math.max(20, rsz.w + (e.clientX - rsz.sx)), nh = Math.max(20, rsz.h + (e.clientY - rsz.sy));
+		if (it.kind === 'joystick') nh = nw;
+		const sn = snapSize(it, nw, nh);
+		nw = Math.max(20, sn.w); nh = it.kind === 'joystick' ? nw : Math.max(20, sn.h);
 		it.data.width = Math.round(nw / U / f);
 		it.data.height = it.kind === 'joystick' ? it.data.width : Math.round(nh / U / f);
 		placeAll();
@@ -331,6 +470,7 @@ function bind(it: Item) {
 	const rzEnd = (e: PointerEvent) => {
 		if (!rsz || e.pointerId !== rsz.pid) return;
 		rsz = null;
+		clearGuides();
 		keepPosition(it);
 		Controls.persist(); emit();
 	};
@@ -368,7 +508,8 @@ function bind(it: Item) {
 			if (it.kind === 'sub' && it.owner!.drawer!.orientation !== 'FREE') return;
 			const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
 			if (Math.hypot(dx, dy) > 4) drag.moved = true;
-			it.rect.x = drag.ox + dx; it.rect.y = drag.oy + dy;
+			const sp = snapPosition(it, drag.ox + dx, drag.oy + dy, it.rect.w, it.rect.h);
+			it.rect.x = sp.x; it.rect.y = sp.y;
 			el.style.left = it.rect.x + 'px'; el.style.top = it.rect.y + 'px';
 			if (it.kind === 'drawer') { it.data.dynamicX = generateDynamicX(it.rect.x, it.data); it.data.dynamicY = generateDynamicY(it.rect.y, it.data); placeAll(); }
 			return;
@@ -397,6 +538,7 @@ function bind(it: Item) {
 	const end = (e: PointerEvent) => {
 		if (state.editing) {
 			if (drag && e.pointerId === drag.pid) {
+				clearGuides();
 				if (drag.moved && !(it.kind === 'sub' && it.owner!.drawer!.orientation !== 'FREE')) {
 					it.data.dynamicX = generateDynamicX(it.rect.x, it.data);
 					it.data.dynamicY = generateDynamicY(it.rect.y, it.data);
@@ -446,8 +588,14 @@ export const Controls = {
 		state.started = true;
 		loadStore();
 		state.root = h('div', { id: 'bb-android-controls', class: UI_CLASS });
+		state.gridEl = h('div', { id: 'bb-android-grid', class: UI_CLASS });
+		state.guidesEl = h('div', { id: 'bb-android-guides', class: UI_CLASS });
+		state.root.append(state.gridEl, state.guidesEl);
 		document.body.appendChild(state.root);
-		window.addEventListener('resize', () => { if (state.layout) { placeAll(); } });
+		state.grid = Math.max(1, Math.min(32, Store.get<number>('edit_grid', 1)));
+		state.showGrid = Store.get<boolean>('edit_show_grid', true);
+		state.magnet = Store.get<boolean>('edit_magnet', true);
+		window.addEventListener('resize', () => { if (state.layout) { placeAll(); } drawGrid(); });
 		Input.installTouchRouter();
 		Controls.loadActive();
 	},
@@ -470,7 +618,7 @@ export const Controls = {
 		state.layout = state.active ? cloneLayout(state.profiles[state.active].layout) : null;
 		state.selected = null;
 		state.root!.style.display = state.layout ? '' : 'none';
-		if (state.layout) build(); else { state.items = []; state.root!.replaceChildren(); }
+		if (state.layout) build(); else { state.items = []; state.root!.replaceChildren(); if (state.gridEl) state.root!.append(state.gridEl); }
 		emit();
 	},
 	setActive(id: string | null) {
@@ -525,19 +673,43 @@ export const Controls = {
 	// edição
 	setEditing(on: boolean) {
 		if (on && !state.layout) return;
+		if (on === state.editing) return;
 		state.editing = on;
 		state.root!.classList.toggle('editing', on);
-		if (on) Input.releaseAllKeys();
-		if (!on) { Controls.persist(true); state.selected = null; }
+		if (on) { Input.releaseAllKeys(); state.snapshot = cloneLayout(state.layout!); }
+		else { Controls.persist(true); state.selected = null; state.snapshot = null; clearGuides(); }
 		state.items.forEach(i => { if (i.kind === 'drawer') i.open = on; });
-		placeAll();
+		placeAll(); drawGrid();
 		emit();
 	},
+	/** Sai da edição descartando tudo que foi mudado desde que ela começou. */
+	cancelEditing() {
+		if (!state.editing) return;
+		if (state.snapshot && state.layout) {
+			state.layout = cloneLayout(state.snapshot);
+			state.selected = null;
+		}
+		state.snapshot = null;
+		state.editing = false;
+		state.root!.classList.remove('editing');
+		clearGuides();
+		build(); Controls.persist(true);
+		state.items.forEach(i => { if (i.kind === 'drawer') i.open = false; });
+		placeAll(); drawGrid();
+		emit();
+	},
+	get grid() { return state.grid; },
+	get showGrid() { return state.showGrid; },
+	get magnet() { return state.magnet; },
+	setGrid(n: number) { state.grid = Math.max(1, Math.min(32, Math.round(n))); Store.set('edit_grid', state.grid); drawGrid(); },
+	setShowGrid(on: boolean) { state.showGrid = on; Store.set('edit_show_grid', on); drawGrid(); },
+	setMagnet(on: boolean) { state.magnet = on; Store.set('edit_magnet', on); },
 	select(it: Item | null) {
 		state.selected = it;
 		state.items.forEach(applyVisibility);
 		emit();
 	},
+	replaceLayout(l: Layout) { state.layout = cloneLayout(l); state.selected = null; build(); Controls.persist(); emit(); },
 	refresh() { if (state.layout) { placeAll(); } },
 	rebuild() { if (state.layout) { build(); Controls.persist(); emit(); } },
 

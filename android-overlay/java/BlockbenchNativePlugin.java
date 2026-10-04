@@ -111,6 +111,21 @@ public class BlockbenchNativePlugin extends Plugin {
         call.resolve();
     }
 
+    /** Modo tela cheia imersivo (esconde barras do sistema). Reaplicado em MainActivity ao recuperar o foco. */
+    @PluginMethod
+    public void setFullscreen(final PluginCall call) {
+        final boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+        final Activity activity = getActivity();
+        if (activity == null) { call.reject("Sem Activity"); return; }
+        MainActivity.fullscreen = enabled;
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() {
+                MainActivity.applyFullscreen(activity);
+                call.resolve();
+            }
+        });
+    }
+
     /** Forçar Encerramento: derruba o Keep Alive, fecha a tarefa e mata o processo. */
     @PluginMethod
     public void forceQuit(PluginCall call) {

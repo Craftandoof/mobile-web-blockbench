@@ -15,6 +15,27 @@ Base: Blockbench 5.2.1, target **web** (não o Electron). A ponte só ativa dent
 
 ## Menu flutuante (☰) e controles de touch
 Código em `js/android/` (carregado só dentro do app Android):
+- `android_menu.ts` — botão ☰ **arrastável** (posição guardada), com opacidade e tamanho ajustáveis, e os menus laterais empilhados (todos do mesmo lado, um por cima do outro; o de trás fica desativado). Itens: Enviar Input, Configurações Persistentes (opacidade/tamanho do menu, tamanho do mouse, Keep Alive, **Modo Tela Cheia**, versão de computador, perfis de touch) e Forçar Encerramento. O Voltar do Android fecha o menu de cima sem desfazer nada no Blockbench.
+- `send_keyboard.ts` — **Enviar Input**: teclado completo (abas ① e ②). Tocar numa tecla só a seleciona; "Enviar tecla" manda o combo inteiro (ex.: Ctrl + Shift + S) de uma vez. Tem também envio de texto.
+- `touch_controls.ts` + `touch_editor.ts` — controles na tela e editor. **Editar Perfil de Touch** entra direto no modo de edição: o ☰ passa a abrir o menu de edição (criar botão/joystick/drawer/botão especial, propriedades, grade, encaixe, restaurar padrão, descartar) e **Salvar e sair** volta ao menu normal. Na edição há **grade** de 1 a 32 divisões e **ímã** que alinha bordas/centros e encosta controles uns nos outros, com linhas-guia.
+- `pojav_format.ts` lê/grava o **mesmo JSON do PojavLauncher** (v2–v8: `mControlDataList`, `mDrawerDataList`, `mJoystickDataList`, `dynamicX/Y`, códigos GLFW e botões especiais). `keymap.ts` traduz GLFW → teclas do DOM (gerado a partir do `LwjglGlfwKeycode.java` do Pojav).
+- **Layout padrão** (`defaultLayout()` em `touch_controls.ts`; não altera nada do formato do Pojav): quatro drawers no centro inferior — **Mouse**, **Ctrl/Alt**, **Edição**, **Teclas** — e só o botão GUI solto. Fechados não ocupam a tela; um modificador preso (Ctrl/Shift/Alt) deixa o drawer destacado.
+- `input_emulator.ts` — teclado, mouse virtual (botões, ponteiro estilo trackpad com tamanho ajustável, rolagem com dois dedos), eventos de hover (`mouseenter/over/leave/out`, que os menus do Blockbench usam), rolagem real de containers, arrasto de sliders e lista própria para `<select>`.
+- Perfis ficam no `localStorage` do app; exportar/importar usa o seletor nativo de arquivos.
+
+**Keep Alive:** o serviço é `START_NOT_STICKY`, tem `stopWithTask`, para em `onTaskRemoved` e quando a Activity é fechada de verdade (`onDestroy` com `isFinishing`). "Forçar Encerramento" para o serviço, remove a tarefa e mata o processo.
+
+**Tela cheia:** `BlockbenchNative.setFullscreen` esconde as barras do sistema (imersivo, deslizar da borda mostra); `MainActivity` reaplica ao recuperar o foco.
+
+**Forçar Versão de Computador:** grava `bb_android_force_desktop`; um script injetado no `index.html` (por `prepare-www.mjs`) troca o viewport para 1280 px na abertura seguinte. Exige recarregar.
+
+**Não portado do Pojav** (não faz sentido no Blockbench): rotação de câmera "grab", hotbar, e o formato v1 (sem `version`).
+
+## Ícone e splash
+`scripts/generate-android-assets.py` gera ícones (legado + adaptativo) e splash a partir de `icon.png` / `icon_maskable.png`, em `android-overlay/res/`. `android-overlay.mjs` copia isso por cima do template do Capacitor (troca o ícone e o splash padrão).
+
+## Menu flutuante (☰) e controles de touch
+Código em `js/android/` (carregado só dentro do app Android):
 - `android_menu.ts` — botão ☰ no topo central e os menus laterais empilhados (Enviar Input, Configurações Persistentes, Forçar Encerramento). O Voltar do Android fecha o menu de cima sem desfazer nada no Blockbench.
 - `touch_controls.ts` + `touch_editor.ts` — controles na tela e editor de perfis. `pojav_format.ts` lê/grava o **mesmo JSON do PojavLauncher** (versões 2–8; campos `mControlDataList`, `mDrawerDataList`, `mJoystickDataList`, `dynamicX/Y` com `${margin}`, `${width}`…, códigos GLFW e botões especiais −1…−9). `keymap.ts` traduz GLFW → teclas do DOM (gerado a partir do `LwjglGlfwKeycode.java` do Pojav).
 - `input_emulator.ts` — teclado, mouse (botões, rolagem, ponteiro virtual estilo trackpad) e teclado virtual.
