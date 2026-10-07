@@ -195,7 +195,9 @@
 		"workbox-build": "^7.4.1",
 		"@capacitor/android": "^7.4.0",
 		"@capacitor/cli": "^7.4.0",
-		"@capacitor/core": "^7.4.0"
+		"@capacitor/core": "^7.4.0",
+		"buffer": "^6.0.3",
+		"pako": "^1.0.11"
 	},
 	"dependencies": {
 		"@electron/remote": "^2.1.2",

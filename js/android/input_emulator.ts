@@ -186,6 +186,7 @@ function fire(type: string, target: Element, button: number, extra: any = {}) {
 	} else {
 		ev = new MouseEvent(type.startsWith('pointer') ? 'mouse' + type.slice(7) : type, init);
 	}
+	(ev as any).bbSynthetic = true;
 	target.dispatchEvent(ev);
 	return ev;
 }

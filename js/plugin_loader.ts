@@ -807,7 +807,9 @@ export class Plugin {
 		}
 		try {
 			const func = new Function('requireNativeModule', 'require', code + `\n//# sourceURL=PLUGINS/(Plugin):${this.id}.js`);
-			const scoped_require = isApp ? getPluginScopedRequire(this) : undefined;
+			// Android (Capacitor): require() de Node emulado para plugins desktop (js/android/node)
+			const android_require = !isApp ? (window as any).AndroidBridge?.pluginRequire?.(this) : undefined;
+			const scoped_require = isApp ? getPluginScopedRequire(this) : android_require;
 			func(scoped_require, scoped_require);
 		} catch (err) {
 			console.error(err);
@@ -834,8 +836,11 @@ export class Plugin {
 		return this.installed && !this.disabled && ((this.source == 'file' && isApp) || (this.source == 'url'));
 	}
 	isInstallable() {
+		// Android (Capacitor): plugins 'desktop' ficam instaláveis quando a compatibilidade com Node está ligada
+		const android_compat = !isApp && !!(window as any).AndroidBridge?.nodeCompatActive?.();
 		let result: string | boolean =
 			this.variant === 'both' ||
+			(android_compat && this.variant === 'desktop') ||
 			(
 				isApp === (this.variant === 'desktop') &&
 				isApp !== (this.variant === 'web')

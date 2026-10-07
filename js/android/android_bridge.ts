@@ -8,6 +8,8 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { initAndroidUi } from './android_menu';
 import { ignoreFileLimits, pickAnyFile } from './file_limits';
+import { createNodeCompat, NodeCompat } from './node';
+import { Store, toast } from './ui_kit';
 
 let isNative = false;
 let Native: any = null;
@@ -61,6 +63,21 @@ function blobToBase64(blob: Blob): Promise<string> {
 	});
 }
 
+// ---- compatibilidade com Node para plugins desktop (fs real via BBNativeFs, path, zlib, crypto...)
+let compat: NodeCompat | null = null;
+const pluginCompatEnabled = () => isNative && Store.get<boolean>('plugin_compat', true);
+function getCompat(): NodeCompat | null {
+	if (!isNative) return null;
+	if (!compat) {
+		compat = createNodeCompat((window as any).BBNativeFs, {
+			confirm: m => window.confirm(m),
+			toast: m => toast(m),
+			openExternal: url => Native.openExternal({ url }),
+		});
+	}
+	return compat;
+}
+
 export const AndroidBridge = {
 	active: isNative,
 
@@ -88,6 +105,18 @@ export const AndroidBridge = {
 		})();
 		return true;
 	},
+
+	/** True quando plugins desktop podem ser instalados/executados (compatibilidade com Node ligada). */
+	nodeCompatActive(): boolean { return pluginCompatEnabled(); },
+	/** require() de Node para o plugin (ver js/android/node). undefined = comportamento do navegador. */
+	pluginRequire(plugin: any) { return pluginCompatEnabled() ? getCompat()!.requireFor(plugin) : undefined; },
+
+	/**
+	 * Plugue um executor de programas (ex.: ffmpeg) no child_process emulado dos plugins desktop.
+	 * fn(cmd, args, options) deve devolver um objeto com eventos 'close'/'error' e, se houver saída, stdout/stderr
+	 * (EventEmitter). Passe null para remover.
+	 */
+	setProcessRunner(fn: ((cmd: string, args: string[], options: any) => any) | null) { getCompat()?.setProcessRunner(fn); },
 
 	/** True quando a opção "Ignorar limitação de arquivo" está ligada. */
 	ignoreFileLimits(): boolean { return isNative && ignoreFileLimits(); },
@@ -153,6 +182,8 @@ if (isNative) try {
 	});
 	// Reopening of previous projects happens in AutoBackup.initialize() (see patches/js_auto_backup.ts.patch)
 
+	if (pluginCompatEnabled()) { try { getCompat()?.installGlobals(); } catch (e) { console.error('Compat Node:', e); } }
+
 	// --- Menu flutuante, Enviar Input, configurações e controles de touch ---
 	initAndroidUi({
 		isNative,
@@ -160,6 +191,14 @@ if (isNative) try {
 		setKeepAlive: enabled => AndroidBridge.setKeepAlive(enabled),
 		setFullscreen: on => AndroidBridge.setFullscreen(on),
 		setFillScreen: on => AndroidBridge.setFillScreen(on),
+		pluginCompat: {
+			enabled: () => pluginCompatEnabled(),
+			setEnabled: on => { Store.set('plugin_compat', on); if (on) getCompat()?.installGlobals(); },
+			hasAllFilesAccess: () => !!getCompat()?.hasAllFilesAccess(),
+			requestAllFilesAccess: () => Native.requestAllFilesAccess(),
+			revokeAll: () => getCompat()?.revokeAll(),
+			permissionCount: () => Object.keys(getCompat()?.permissions() || {}).length,
+		},
 		forceQuit: () => AndroidBridge.forceQuit(),
 		flush,
 	});

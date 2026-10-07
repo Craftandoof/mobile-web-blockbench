@@ -24,6 +24,20 @@ Código em `js/android/` (carregado só dentro do app Android):
 - `file_limits.ts` — **Ignorar limitação de arquivo**: o seletor abre sem filtro de tipo (permite plugins `.js`) e o Blockbench tenta formatos JSON pelo conteúdo quando a extensão é desconhecida.
 - Perfis ficam no `localStorage` do app; exportar/importar usa o seletor nativo de arquivos.
 
+## Plugins desktop (Node) no Android
+Os plugins marcados "só no app" usam `require('fs')`, `path`, `zlib`, `crypto`… O build web não tem esses módulos; a camada `js/android/node/` os emula, espelhando o `getPluginScopedRequire` do desktop:
+- **Módulos seguros** (sem pergunta): `path`, `crypto` (md5/sha1/sha256), `zlib` (pako), `events`, `url`, `querystring`, `timers`, `string_decoder`, `buffer`, `perf_hooks`. `Buffer`, `PathModule` e `SystemInfo` viram globais, como no desktop.
+- **Módulos com permissão por plugin** (diálogo nativo, lembrado; revogável em Configurações): `fs` (com `scope` de pasta), `os`, `process`, `shell`, `clipboard`, `util`, `child_process`, `net`, `https`.
+- **`fs` de verdade**: a classe Java `NativeFs` (exposta ao JS como `window.BBNativeFs`) lê e grava no armazenamento real com chamadas síncronas. Só enxerga as pastas do app, ou todo o armazenamento depois de conceder "acesso a todos os arquivos" (Configurações Persistentes > Plugins desktop). Caminhos fora disso dão `EACCES`.
+- **Loja**: com a compatibilidade ligada (padrão), os plugins `desktop` ficam instaláveis (`plugin_loader.ts`, patch).
+- **Não suportado**: processos externos (`child_process` devolve `ENOENT`), sockets (`net`), `https.request`. Para plugar um executor nativo (ex.: ffmpeg) use `AndroidBridge.setProcessRunner(fn)`.
+- Cobertura: todo método de Node chamado pelos 24 plugins desktop do repositório (fs, path, zlib, crypto, process, Buffer…) existe na camada. `animated_java` e `bamo` (bundles grandes) ainda precisam de teste real.
+
+## Isolamento do HUD (`touch_guard.ts`)
+- Dedos que começaram em controles do app não entram em `event.touches` dos eventos do Blockbench (o OrbitControls trata 2 dedos como pinça).
+- Toque no HUD é cancelado na origem; cliques/mouse "de compatibilidade" logo depois, perto do ponto tocado, são engolidos (nunca os do mouse virtual).
+- Ctrl/Shift/Alt segurados no HUD valem como `ctrlKey/shiftKey/altKey` nos toques e cliques reais (seleção múltipla de keyframes).
+
 **Keep Alive:** o serviço é `START_NOT_STICKY`, tem `stopWithTask`, para em `onTaskRemoved` e quando a Activity é fechada de verdade (`onDestroy` com `isFinishing`). "Forçar Encerramento" para o serviço, remove a tarefa e mata o processo.
 
 **Tela cheia / preencher a tela:** `setFullscreen` esconde as barras do sistema (imersivo); `setFillScreen` tira o recuo da janela e usa também a área do recorte da câmera. `MainActivity` reaplica ao recuperar o foco e desliga o zoom de pinça do WebView; o viewport do app é fixo (`user-scalable=no`, `viewport-fit=cover`).

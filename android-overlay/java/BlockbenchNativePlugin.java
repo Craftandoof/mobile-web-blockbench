@@ -14,6 +14,7 @@ import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.util.Base64;
+import androidx.core.app.ActivityCompat;
 import androidx.activity.result.ActivityResult;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
@@ -32,6 +33,54 @@ import java.io.OutputStream;
     }
 )
 public class BlockbenchNativePlugin extends Plugin {
+
+    /** Injeta window.BBNativeFs (fs síncrono dos plugins desktop) antes de a página carregar. */
+    @Override
+    public void load() {
+        try {
+            getBridge().getWebView().addJavascriptInterface(new NativeFs(getContext()), "BBNativeFs");
+        } catch (Exception ignored) { /* sem WebView: o JS avisa que o acesso nativo não existe */ }
+    }
+
+    @PluginMethod
+    public void hasAllFilesAccess(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("granted", NativeFs.hasAllFilesAccess(getContext()));
+        call.resolve(r);
+    }
+
+    /** Abre a tela do sistema para conceder "acesso a todos os arquivos" (ou pede a permissão clássica no Android < 11). */
+    @PluginMethod
+    public void requestAllFilesAccess(PluginCall call) {
+        Context ctx = getContext();
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + ctx.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+            } catch (Exception e) {
+                Intent i = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+            }
+        } else if (getActivity() != null) {
+            ActivityCompat.requestPermissions(getActivity(),
+                new String[] { Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE }, 4242);
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void openExternal(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || url.isEmpty()) { call.reject("URL ausente"); return; }
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) { call.reject("Não foi possível abrir: " + e.getMessage()); }
+    }
 
     // ---------- Native save dialog (SAF) with the real file name ----------
     @PluginMethod

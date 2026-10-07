@@ -36,6 +36,9 @@ Object.assign(pkg.scripts, {
 for (const dep of ['@capacitor/android', '@capacitor/cli', '@capacitor/core']) {
   pkg.devDependencies[dep] ??= '^7.4.0';
 }
+// camada de compatibilidade com Node (plugins desktop): Buffer e zlib
+pkg.devDependencies['buffer'] ??= '^6.0.3';
+pkg.devDependencies['pako'] ??= '^1.0.11';
 const eol = raw.includes('\r\n') ? '\r\n' : '\n';
 const out = JSON.stringify(pkg, null, '\t').replace(/\n/g, eol) + (raw.endsWith('\n') ? eol : '');
 if (out !== raw) { fs.writeFileSync('package.json', out); console.log('updated   package.json'); }

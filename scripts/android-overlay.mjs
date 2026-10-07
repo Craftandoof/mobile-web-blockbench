@@ -26,6 +26,15 @@ const perms = [
 for (const p of perms) {
   if (!m.includes(p)) m = m.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
 }
+// Acesso a arquivos para os plugins desktop (fs real). MANAGE_EXTERNAL_STORAGE = "acesso a todos os arquivos".
+for (const [perm, attrs] of [
+  ['android.permission.MANAGE_EXTERNAL_STORAGE', ''],
+  ['android.permission.READ_EXTERNAL_STORAGE', ' android:maxSdkVersion="32"'],
+  ['android.permission.WRITE_EXTERNAL_STORAGE', ' android:maxSdkVersion="29"'],
+]) {
+  if (!m.includes(perm)) m = m.replace('</manifest>', `    <uses-permission android:name="${perm}"${attrs} />\n</manifest>`);
+}
+if (!m.includes('requestLegacyExternalStorage')) m = m.replace('<application', '<application\n        android:requestLegacyExternalStorage="true"');
 if (!m.includes('KeepAliveService')) {
   m = m.replace('</application>', `
         <service

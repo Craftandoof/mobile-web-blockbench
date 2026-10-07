@@ -8,6 +8,7 @@ import {
 	argbToCss, evalDynamic, parseLayout, serializeLayout, LAYOUT_VERSION,
 } from './pojav_format';
 import { DEFAULT_LAYOUT_JSON } from './default_layout';
+import { installTouchGuard } from './touch_guard';
 import * as Input from './input_emulator';
 import { UI_CLASS } from './input_emulator';
 import { h, Store, uiScale, toast, isolateEvents } from './ui_kit';
@@ -562,11 +563,14 @@ export const Controls = {
 		state.root.append(state.gridEl, state.guidesEl);
 		document.body.appendChild(state.root);
 		isolateEvents(state.root);
+		// cancelar touchstart/touchend no HUD impede o clique de compatibilidade no que estiver embaixo
+		for (const t of ['touchstart', 'touchend']) state.root.addEventListener(t, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 		state.grid = Math.max(1, Math.min(32, Store.get<number>('edit_grid', 1)));
 		state.showGrid = Store.get<boolean>('edit_show_grid', true);
 		state.magnet = Store.get<boolean>('edit_magnet', true);
 		window.addEventListener('resize', () => { if (state.layout) { placeAll(); } drawGrid(); });
 		Input.installTouchpad();
+		installTouchGuard();
 		Controls.loadActive();
 	},
 

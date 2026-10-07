@@ -16,6 +16,14 @@ export interface MenuHost {
 	setKeepAlive(on: boolean): Promise<void>;
 	setFullscreen(on: boolean): Promise<void>;
 	setFillScreen(on: boolean): Promise<void>;
+	pluginCompat: {
+		enabled(): boolean;
+		setEnabled(on: boolean): void;
+		hasAllFilesAccess(): boolean;
+		requestAllFilesAccess(): Promise<void>;
+		revokeAll(): void;
+		permissionCount(): number;
+	};
 	forceQuit(): Promise<void>;
 	flush(): void;
 }
@@ -190,6 +198,23 @@ function openSettings() {
 				},
 			}),
 
+			section('Plugins desktop (Node)'),
+			toggleItem('Compatibilidade com plugins desktop', {
+				value: host.pluginCompat.enabled(),
+				hint: 'Libera na loja os plugins marcados "só no app" e emula fs, path, zlib, crypto e outros módulos do Node. Cada plugin pede permissão antes de acessar arquivos',
+				onChange: on => { host.pluginCompat.setEnabled(on); toast(on ? 'Plugins desktop liberados' : 'Plugins desktop bloqueados de novo'); draw(); },
+			}),
+			item('Acesso a todos os arquivos', async () => {
+				if (host.pluginCompat.hasAllFilesAccess()) { toast('O acesso a todos os arquivos já está concedido'); return; }
+				try { await host.pluginCompat.requestAllFilesAccess(); toast('Ative "Permitir acesso a todos os arquivos" e volte ao app', 4500); }
+				catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+			}, { icon: host.pluginCompat.hasAllFilesAccess() ? '✓' : '⚠', hint: host.pluginCompat.hasAllFilesAccess() ? 'Concedido: os plugins podem ler e gravar fora da pasta do app (se você permitir)' : 'Não concedido: sem isso os plugins só enxergam as pastas do próprio app. Toque para conceder' }),
+			item('Revogar permissões dos plugins', async () => {
+				const n = host.pluginCompat.permissionCount();
+				if (!n) { toast('Nenhum plugin tem permissão guardada'); return; }
+				if (await confirmDialog({ title: 'Revogar permissões', message: `${n} plugin(s) têm permissões guardadas (arquivos, rede, processos...). Eles vão perguntar de novo.`, confirmLabel: 'Revogar', danger: true })) { host.pluginCompat.revokeAll(); toast('Permissões revogadas'); draw(); }
+			}, { icon: '⛔', hint: `${host.pluginCompat.permissionCount()} plugin(s) com permissão guardada` }),
+
 			section('Arquivos'),
 			toggleItem('Ignorar limitação de arquivo', {
 				value: ignoreFileLimits(),
@@ -208,8 +233,10 @@ function openSettings() {
 	};
 	draw();
 	const un = Controls.subscribe(() => { if (dr.el.isConnected) draw(); });
+	const onVisible = () => { if (document.visibilityState === 'visible' && dr.el.isConnected) draw(); };
+	document.addEventListener('visibilitychange', onVisible);
 	const close = dr.close;
-	dr.close = () => { un(); close(); };
+	dr.close = () => { un(); document.removeEventListener('visibilitychange', onVisible); close(); };
 }
 
 // ------------------------------------------------------------------ inicialização
