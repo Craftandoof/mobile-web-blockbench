@@ -4,7 +4,9 @@
  *   resposta = "O" + carga   (sucesso)   |   "E:CODIGO:mensagem"   (erro)
  * Os dados binários trafegam em base64.
  */
-import { Buffer } from 'buffer';
+// 'buffer/' (com a barra) = pacote npm. 'buffer' sem barra é o módulo interno do Node: o esbuild (platform node) o
+// deixaria como import externo no bundle e o WebView falharia com "Failed to resolve module specifier".
+import { Buffer } from 'buffer/';
 import type { PathModule } from './path';
 
 export type BufferEncoding = 'utf8' | 'utf-8' | 'hex' | 'base64' | 'base64url' | 'ascii' | 'latin1' | 'binary' | 'ucs2' | 'ucs-2' | 'utf16le' | 'utf-16le';

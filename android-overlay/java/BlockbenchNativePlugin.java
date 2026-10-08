@@ -2,18 +2,21 @@ package com.craftandoof.blockbench;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
+import android.os.ParcelFileDescriptor;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.util.Base64;
+import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.activity.result.ActivityResult;
 import androidx.core.content.ContextCompat;
@@ -24,6 +27,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 
 @CapacitorPlugin(
@@ -100,7 +105,7 @@ public class BlockbenchNativePlugin extends Plugin {
 
     @ActivityCallback
     private void saveFileResult(PluginCall call, ActivityResult result) {
-        if (call == null) return;
+        if (call == null) { Log.e("BlockbenchNative", "saveFileResult sem PluginCall: o arquivo escolhido ficou vazio"); return; }
         Intent data = result.getData();
         if (result.getResultCode() != android.app.Activity.RESULT_OK || data == null || data.getData() == null) {
             JSObject r = new JSObject();
@@ -111,28 +116,66 @@ public class BlockbenchNativePlugin extends Plugin {
         Uri uri = data.getData();
         String wanted = call.getString("name", "file");
         try {
-            byte[] bytes = Base64.decode(call.getString("data"), Base64.DEFAULT);
-            // "wt" = write + truncate, otherwise overwriting a larger file leaves trailing garbage
-            try (OutputStream os = getContext().getContentResolver().openOutputStream(uri, "wt")) {
-                if (os == null) throw new Exception("Could not open output stream");
-                os.write(bytes);
-                os.flush();
+            String b64 = call.getString("data");
+            byte[] bytes = Base64.decode(b64 == null ? "" : b64, Base64.DEFAULT);
+            Integer expected = call.getInt("size");
+            if (expected != null && expected.intValue() != bytes.length) {
+                call.reject("Dados corrompidos na transferência (" + bytes.length + " de " + expected + " bytes)");
+                return;
             }
-            String finalName = displayName(uri, wanted);
-            // Some providers append an extension (e.g. ".bin"); try to restore the requested name.
-            if (!finalName.equals(wanted)) {
-                try {
-                    Uri renamed = DocumentsContract.renameDocument(getContext().getContentResolver(), uri, wanted);
-                    if (renamed != null) { uri = renamed; finalName = wanted; }
-                } catch (Exception ignored) { /* keep provider's name */ }
-            }
+            if (bytes.length == 0) { call.reject("Conteúdo vazio: nada foi gravado"); return; }
+            long written = writeAndVerify(uri, bytes);
             JSObject r = new JSObject();
             r.put("uri", uri.toString());
-            r.put("name", finalName);
+            r.put("name", displayName(uri, wanted));
+            r.put("bytes", written);
             call.resolve(r);
         } catch (Exception e) {
             call.reject("Save failed: " + e.getMessage());
         }
+    }
+
+    /** Grava e CONFERE o tamanho final; tenta outros modos de abertura se o provedor deixar o arquivo vazio/incompleto. */
+    private long writeAndVerify(Uri uri, byte[] bytes) throws Exception {
+        ContentResolver cr = getContext().getContentResolver();
+        Exception last = null;
+        for (String mode : new String[] { "wt", "rwt", "w" }) {
+            try {
+                try (ParcelFileDescriptor pfd = cr.openFileDescriptor(uri, mode);
+                     FileOutputStream os = new FileOutputStream(pfd.getFileDescriptor())) {
+                    os.write(bytes);
+                    os.flush();
+                    try { os.getFD().sync(); } catch (Exception ignored) { /* nem todo descritor aceita sync */ }
+                }
+                long len = sizeOf(cr, uri);
+                if (len < 0 || len == bytes.length) return bytes.length;   // -1 = provedor não informa o tamanho
+                last = new IOException("o provedor mostra " + len + " bytes em vez de " + bytes.length);
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        // última tentativa pelo caminho clássico
+        try (OutputStream os = cr.openOutputStream(uri, "wt")) {
+            if (os == null) throw new IOException("não foi possível abrir o arquivo para escrita");
+            os.write(bytes);
+            os.flush();
+        }
+        long len = sizeOf(cr, uri);
+        if (len < 0 || len == bytes.length) return bytes.length;
+        throw last != null ? last : new IOException("tamanho gravado " + len + " != " + bytes.length);
+    }
+
+    private long sizeOf(ContentResolver cr, Uri uri) {
+        try (Cursor c = cr.query(uri, new String[] { OpenableColumns.SIZE }, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(OpenableColumns.SIZE);
+                if (i >= 0 && !c.isNull(i)) return c.getLong(i);
+            }
+        } catch (Exception ignored) { /* tenta o descritor */ }
+        try (ParcelFileDescriptor pfd = cr.openFileDescriptor(uri, "r")) {
+            if (pfd != null) return pfd.getStatSize();
+        } catch (Exception ignored) { /* sem tamanho */ }
+        return -1;
     }
 
     private String displayName(Uri uri, String fallback) {

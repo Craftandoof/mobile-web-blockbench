@@ -4,6 +4,21 @@ import fs from 'node:fs';
 
 execSync('node build.js --target=web', { stdio: 'inherit' });
 
+// O WebView carrega o bundle como módulo ES: qualquer import de módulo "cru" (ex.: 'buffer', 'fs') que o esbuild
+// tenha deixado de fora derruba o app inteiro ("Failed to resolve module specifier"). Barra o build aqui.
+// O esbuild relê o bundle e lista os imports externos de verdade (sem confundir com texto dentro de strings).
+{
+  const { build } = await import('esbuild');
+  const r = await build({ entryPoints: ['dist/bundle.js'], bundle: true, write: false, metafile: true, format: 'esm', platform: 'neutral', external: ['*'], logLevel: 'silent' });
+  const out = Object.values(r.metafile.outputs)[0];
+  const bare = [...new Set(out.imports.filter(i => i.external).map(i => i.path))];
+  if (bare.length) {
+    console.error('ERRO: o bundle ainda importa módulos que o WebView não resolve: ' + bare.join(', ') +
+      '\nUse o pacote npm com barra no fim (ex.: "buffer/") ou inclua o módulo no bundle.');
+    process.exit(1);
+  }
+}
+
 fs.rmSync('www', { recursive: true, force: true });
 fs.mkdirSync('www/dist', { recursive: true });
 fs.copyFileSync('dist/bundle.js', 'www/dist/bundle.js');

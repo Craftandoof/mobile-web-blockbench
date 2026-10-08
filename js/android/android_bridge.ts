@@ -8,6 +8,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { initAndroidUi } from './android_menu';
 import { ignoreFileLimits, pickAnyFile } from './file_limits';
+import { contentToBytes, bytesToBase64 } from './export_data';
 import { createNodeCompat, NodeCompat } from './node';
 import { Store, toast } from './ui_kit';
 
@@ -40,29 +41,6 @@ function mimeFor(name: string): string {
 	return map[ext] || 'application/octet-stream';
 }
 
-async function toBlob(content: any, savetype: string | undefined): Promise<Blob> {
-	if (content instanceof Blob) return content;
-	if (content instanceof ArrayBuffer || ArrayBuffer.isView(content)) return new Blob([content as any]);
-	if (typeof content === 'string') {
-		if (savetype === 'image') {
-			// data: URL or blob:/http URL of a texture
-			const res = await fetch(content);
-			return await res.blob();
-		}
-		return new Blob([content], { type: 'text/plain;charset=utf-8' });
-	}
-	throw new Error('Unsupported export content');
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const r = new FileReader();
-		r.onload = () => resolve((r.result as string).split(',')[1] || '');
-		r.onerror = () => reject(r.error);
-		r.readAsDataURL(blob);
-	});
-}
-
 // ---- compatibilidade com Node para plugins desktop (fs real via BBNativeFs, path, zlib, crypto...)
 let compat: NodeCompat | null = null;
 const pluginCompatEnabled = () => isNative && Store.get<boolean>('plugin_compat', true);
@@ -93,14 +71,20 @@ export const AndroidBridge = {
 		(async () => {
 			try {
 				const savetype = typeof options.savetype === 'function' ? options.savetype(name) : options.savetype;
-				const blob = await toBlob(options.content, savetype);
-				const data = await blobToBase64(blob);
-				const res = await Native.saveFile({ name, mime: mimeFor(name), data });
+				const bytes = await contentToBytes(options.content, savetype);
+				if (bytes.length === 0) {
+					// nunca criar um arquivo vazio em silêncio
+					console.warn('Exportação sem conteúdo', { name, savetype, type: typeof options.content });
+					toast('Nada foi salvo: o conteúdo gerado para "' + name + '" está vazio');
+					return;
+				}
+				const res = await Native.saveFile({ name, mime: mimeFor(name), data: bytesToBase64(bytes), size: bytes.length });
 				if (res && res.cancelled) return;
+				if (res && typeof res.bytes === 'number' && res.bytes !== bytes.length) throw new Error(`foram gravados ${res.bytes} de ${bytes.length} bytes`);
 				if (typeof callback === 'function') callback((res && res.name) || name);
 			} catch (err: any) {
 				console.error('Android save failed', err);
-				(window as any).Blockbench?.showQuickMessage?.('Save failed: ' + (err?.message || err), 4000);
+				toast('Falha ao salvar: ' + (err?.message || err), 5000);
 			}
 		})();
 		return true;

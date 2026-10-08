@@ -3,7 +3,7 @@
  * Espelha getPluginScopedRequire() do Blockbench desktop: módulos seguros saem direto, os demais pedem
  * permissão por plugin (guardada), e `fs` aceita `scope` (pasta) como no desktop.
  */
-import { Buffer } from 'buffer';
+import { Buffer } from 'buffer/';
 import { createPath, PathModule } from './path';
 import { createFs, createScopedFs, NativeFs, NodeFs } from './fs';
 import * as M from './misc';

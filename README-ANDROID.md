@@ -33,6 +33,10 @@ Os plugins marcados "só no app" usam `require('fs')`, `path`, `zlib`, `crypto`�
 - **Não suportado**: processos externos (`child_process` devolve `ENOENT`), sockets (`net`), `https.request`. Para plugar um executor nativo (ex.: ffmpeg) use `AndroidBridge.setProcessRunner(fn)`.
 - Cobertura: todo método de Node chamado pelos 24 plugins desktop do repositório (fs, path, zlib, crypto, process, Buffer…) existe na camada. `animated_java` e `bamo` (bundles grandes) ainda precisam de teste real.
 
+## Regras que evitam crashes de build e arquivos vazios
+- **Imports de Node no bundle:** o esbuild usa `platform: node`, então `import 'buffer'` (sem barra) vira o módulo INTERNO do Node, fica de fora do bundle e o WebView quebra com "Failed to resolve module specifier". Use sempre o pacote npm com barra no fim (`import { Buffer } from 'buffer/'`). O `prepare-www.mjs` agora relê o bundle com o esbuild e **falha o build** se sobrar qualquer import externo.
+- **Salvar arquivos:** `export_data.ts` converte o conteúdo em bytes sem passar por `FileReader`, o bridge **recusa salvar conteúdo vazio** (avisa em vez de criar um arquivo de 0 bytes) e envia o tamanho; o Java confere o tamanho recebido e o tamanho final gravado (tentando outros modos de abertura se o provedor deixar o arquivo vazio) e devolve os bytes gravados. O passo de renomear o arquivo depois de gravar foi removido (extensões desconhecidas já usam `octet-stream`, que preserva o nome).
+
 ## Isolamento do HUD (`touch_guard.ts`)
 - Dedos que começaram em controles do app não entram em `event.touches` dos eventos do Blockbench (o OrbitControls trata 2 dedos como pinça).
 - Toque no HUD é cancelado na origem; cliques/mouse "de compatibilidade" logo depois, perto do ponto tocado, são engolidos (nunca os do mouse virtual).

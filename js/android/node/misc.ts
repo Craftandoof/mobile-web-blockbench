@@ -1,5 +1,5 @@
 /** Módulos de Node (além de fs e path) que os plugins desktop usam, adaptados ao WebView do Android. */
-import { Buffer } from 'buffer';
+import { Buffer } from 'buffer/';
 import type { BufferEncoding } from './fs';
 // @ts-ignore (pako 1.x não traz tipos)
 import pako from 'pako';
