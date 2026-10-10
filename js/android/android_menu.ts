@@ -20,6 +20,8 @@ export interface MenuHost {
 		enabled(): boolean;
 		setEnabled(on: boolean): void;
 		hasAllFilesAccess(): boolean;
+		ffmpegStatus(): { found: boolean; path?: string; package?: string; version?: string };
+		openFfmpegPage(): Promise<void>;
 		requestAllFilesAccess(): Promise<void>;
 		revokeAll(): void;
 		permissionCount(): number;
@@ -156,6 +158,12 @@ function openSettings() {
 				onInput: v => { Store.set('mouse_size', v); Input.setMouseSize(v / 100); },
 			}),
 
+			toggleItem('Rolagem com dois dedos no mouse virtual', {
+				value: Store.get<boolean>('pad_scroll', false),
+				hint: 'Desligado (padrão): só um dedo comanda o cursor; dedos extras são ignorados, sem zoom de pinça. Para rolar listas use os botões de rolagem do HUD',
+				onChange: on => { Store.set('pad_scroll', on); Input.setTwoFingerScroll(on); },
+			}),
+
 			section('Processo'),
 			toggleItem('Desativar Keep Alive do Blockbench', {
 				value: !host.keepAliveEnabled(),
@@ -209,6 +217,16 @@ function openSettings() {
 				try { await host.pluginCompat.requestAllFilesAccess(); toast('Ative "Permitir acesso a todos os arquivos" e volte ao app', 4500); }
 				catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
 			}, { icon: host.pluginCompat.hasAllFilesAccess() ? '✓' : '⚠', hint: host.pluginCompat.hasAllFilesAccess() ? 'Concedido: os plugins podem ler e gravar fora da pasta do app (se você permitir)' : 'Não concedido: sem isso os plugins só enxergam as pastas do próprio app. Toque para conceder' }),
+			item('FFmpeg (plugin do Pojav)', async () => {
+				const f = host.pluginCompat.ffmpegStatus();
+				if (f.found) { toast('FFmpeg encontrado: ' + f.path, 4500); return; }
+				try { await host.pluginCompat.openFfmpegPage(); } catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+			}, (() => {
+				const f = host.pluginCompat.ffmpegStatus();
+				return f.found
+					? { icon: '✓', hint: `Encontrado (${f.package}${f.version ? ' ' + f.version : ''}). O Scene Recorder e outros plugins usam este ffmpeg automaticamente` }
+					: { icon: '⚠', hint: 'Não encontrado. Instale o "FFmpeg Plugin" do PojavLauncher (toque para abrir a página); sem ele o Scene Recorder mostra a tela dele para definir o ffmpeg' };
+			})()),
 			item('Revogar permissões dos plugins', async () => {
 				const n = host.pluginCompat.permissionCount();
 				if (!n) { toast('Nenhum plugin tem permissão guardada'); return; }
@@ -252,6 +270,7 @@ export function initAndroidUi(h_: MenuHost) {
 		applyFabOpacity();
 		applyFabSize();
 		Input.setMouseSize(Store.get<number>('mouse_size', 100) / 100);
+		Input.setTwoFingerScroll(Store.get<boolean>('pad_scroll', false));
 		window.addEventListener('resize', () => { applyScale(); applyFabPos(); });
 		document.addEventListener('bb-android-select', (e: any) => pickSelectOption(e.detail));
 		Controls.onMenu(() => { if (!drawerCount()) { if (Controls.editing) openEditMenu(); else openMain(); } });

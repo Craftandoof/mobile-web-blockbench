@@ -44,6 +44,7 @@ public class BlockbenchNativePlugin extends Plugin {
     public void load() {
         try {
             getBridge().getWebView().addJavascriptInterface(new NativeFs(getContext()), "BBNativeFs");
+            getBridge().getWebView().addJavascriptInterface(new NativeProc(getContext()), "BBNativeProc");
         } catch (Exception ignored) { /* sem WebView: o JS avisa que o acesso nativo não existe */ }
     }
 

@@ -34,6 +34,10 @@ for (const [perm, attrs] of [
 ]) {
   if (!m.includes(perm)) m = m.replace('</manifest>', `    <uses-permission android:name="${perm}"${attrs} />\n</manifest>`);
 }
+// Android 11+: sem <queries> o app não enxerga o "FFmpeg Plugin" do PojavLauncher (visibilidade de pacotes)
+if (!m.includes('net.kdt.pojavlaunch.ffmpeg')) {
+  m = m.replace('<application', '<queries>\n        <package android:name="net.kdt.pojavlaunch.ffmpeg" />\n    </queries>\n\n    <application');
+}
 if (!m.includes('requestLegacyExternalStorage')) m = m.replace('<application', '<application\n        android:requestLegacyExternalStorage="true"');
 if (!m.includes('KeepAliveService')) {
   m = m.replace('</application>', `

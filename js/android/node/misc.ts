@@ -238,7 +238,8 @@ export function createProcess(roots: Roots, cwd: () => string) {
 
 // ------------------------------------------------------------------ child_process / net / https / tls
 
-export type ProcessRunner = (cmd: string, args: string[], options: any) => any;
+/** Devolve o processo-filho, ou null/undefined para NÃO tratar o comando (cai no ENOENT padrão). */
+export type ProcessRunner = (cmd: string, args: string[], options: any) => any | null | undefined;
 let runner: ProcessRunner | null = null;
 /** Ponto de extensão: um executor nativo (ex.: ffmpeg do Pojav) pode ser plugado aqui. */
 export function setProcessRunner(fn: ProcessRunner | null) { runner = fn; }
@@ -257,11 +258,11 @@ function notFoundChild(cmd: string) {
 	return child;
 }
 export function createChildProcess() {
-	const run = (cmd: string, args: string[], options: any) => (runner ? runner(cmd, args, options) : notFoundChild(cmd));
+	const run = (cmd: string, args: string[], options: any) => (runner && runner(cmd, args, options)) || notFoundChild(cmd);
 	const execLike = (cmdline: string, args: any, options: any, cb?: Function) => {
 		const callback = [args, options, cb].find(x => typeof x === 'function');
-		const cmd = String(cmdline).split(/\s+/)[0];
-		const child = runner ? runner(cmd, [], {}) : notFoundChild(cmd);
+		const [cmd, ...rest] = String(cmdline).trim().split(/\s+/);
+		const child = (runner && runner(cmd, rest, {})) || notFoundChild(cmd);
 		if (callback) {
 			let out = '', err = '';
 			child.stdout?.on('data', (d: any) => { out += d; }); child.stderr?.on('data', (d: any) => { err += d; });

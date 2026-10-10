@@ -404,8 +404,13 @@ export const toggleVirtualMouse = () => setVirtualMouse(!Mouse.virtual);
 // Isso evita o clique real duplicado, o :hover real e o zoom de pinça do Android.
 
 let padEl: HTMLElement | null = null;
-const pads = new Map<number, { x: number; y: number; sx: number; sy: number; t0: number; moved: boolean }>();
-let padScrollY: number | null = null;
+// Só UM dedo comanda o cursor (como no Pojav). Dedos extras são ignorados: antes, dois dedos no touchpad viravam
+// rolagem (evento de roda) e a câmera dava zoom "de pinça" sem querer. A rolagem com dois dedos agora é opcional.
+let padMain: { id: number; x: number; y: number; sx: number; sy: number; t0: number; moved: boolean } | null = null;
+const padExtra = new Set<number>();
+let padScroll: { y: number; ids: Map<number, number> } | null = null;
+let twoFingerScroll = false;
+export function setTwoFingerScroll(on: boolean) { twoFingerScroll = on; padScroll = null; }
 
 export const mouseActive = () => Mouse.virtual || Mouse.buttons !== 0;
 
@@ -415,7 +420,7 @@ export function syncTouchpad() {
 	if (padEl) padEl.style.display = on ? 'block' : 'none';
 	if (typeof document !== 'undefined') document.documentElement.classList.toggle('bb-mouse-active', on);
 	if (on) syncHoverCss();
-	else { pads.clear(); padScrollY = null; updateHover(null); }
+	else { padMain = null; padExtra.clear(); padScroll = null; updateHover(null); }
 }
 
 function padPointer(e: PointerEvent) { e.preventDefault(); e.stopPropagation(); }
@@ -424,36 +429,47 @@ function onPadDown(e: PointerEvent) {
 	if (e.pointerType === 'mouse') return;       // mouse físico: deixa passar
 	padPointer(e);
 	try { padEl!.setPointerCapture(e.pointerId); } catch { /* ok */ }
-	pads.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t0: Date.now(), moved: false });
-	if (pads.size === 1 && !Mouse.virtual) moveTo(e.clientX, e.clientY);   // sem cursor virtual: posição absoluta
-	if (pads.size >= 2) { for (const p of pads.values()) p.moved = true; padScrollY = null; }
+	if (!padMain) {
+		padMain = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t0: Date.now(), moved: false };
+		if (!Mouse.virtual) moveTo(e.clientX, e.clientY);   // sem cursor virtual: posição absoluta
+		return;
+	}
+	// segundo dedo no touchpad: nunca vira clique nem zoom
+	padExtra.add(e.pointerId);
+	padMain.moved = true;
+	if (twoFingerScroll && Mouse.virtual) padScroll = { y: e.clientY, ids: new Map([[padMain.id, padMain.y], [e.pointerId, e.clientY]]) };
 }
 function onPadMove(e: PointerEvent) {
-	const p = pads.get(e.pointerId);
-	if (!p) return;
+	if (padExtra.has(e.pointerId)) {
+		padPointer(e);
+		if (padScroll) {                              // rolagem com dois dedos (opcional)
+			padScroll.ids.set(e.pointerId, e.clientY);
+			const ys = Array.from(padScroll.ids.values());
+			const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
+			if (Math.abs(padScroll.y - avg) > 0) wheel(padScroll.y - avg);
+			padScroll.y = avg;
+		}
+		return;
+	}
+	const p = padMain;
+	if (!p || p.id !== e.pointerId) return;
 	padPointer(e);
 	const dx = e.clientX - p.x, dy = e.clientY - p.y;
 	p.x = e.clientX; p.y = e.clientY;
 	if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) p.moved = true;
-	if (pads.size >= 2) {
-		// dois dedos = rolagem
-		const ys = Array.from(pads.values()).slice(0, 2).map(q => q.y);
-		const avg = (ys[0] + ys[1]) / 2;
-		if (padScrollY !== null) wheel(padScrollY - avg);
-		padScrollY = avg;
-		return;
-	}
+	if (padScroll) { padScroll.ids.set(p.id, p.y); return; }   // durante a rolagem o cursor fica parado
 	if (Mouse.virtual) moveBy(dx * Mouse.sensitivity, dy * Mouse.sensitivity); else moveTo(e.clientX, e.clientY);
 }
 function onPadEnd(e: PointerEvent) {
-	const p = pads.get(e.pointerId);
-	if (!p) return;
+	if (padExtra.delete(e.pointerId)) { padPointer(e); padScroll = null; return; }
+	const p = padMain;
+	if (!p || p.id !== e.pointerId) return;
 	padPointer(e);
-	const lone = pads.size === 1;
-	pads.delete(e.pointerId);
-	if (pads.size < 2) padScrollY = null;
-	// toque curto, sem arrastar, com o cursor virtual = clique esquerdo (como no Pojav)
-	if (lone && e.type === 'pointerup' && Mouse.virtual && !p.moved && Date.now() - p.t0 < 260) click('left');
+	padMain = null;
+	padScroll = null;
+	// toque curto, sem arrastar, só com o cursor virtual e SEM outros dedos = clique esquerdo (como no Pojav)
+	const alone = padExtra.size === 0;
+	if (alone && e.type === 'pointerup' && Mouse.virtual && !p.moved && Date.now() - p.t0 < 260) click('left');
 }
 
 let touchpadInstalled = false;

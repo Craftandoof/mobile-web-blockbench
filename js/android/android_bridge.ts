@@ -10,6 +10,7 @@ import { initAndroidUi } from './android_menu';
 import { ignoreFileLimits, pickAnyFile } from './file_limits';
 import { contentToBytes, bytesToBase64 } from './export_data';
 import { createNodeCompat, NodeCompat } from './node';
+import { createNativeRunner } from './node/native_proc';
 import { Store, toast } from './ui_kit';
 
 let isNative = false;
@@ -43,6 +44,7 @@ function mimeFor(name: string): string {
 
 // ---- compatibilidade com Node para plugins desktop (fs real via BBNativeFs, path, zlib, crypto...)
 let compat: NodeCompat | null = null;
+let ffmpegInfo: () => { found: boolean; path?: string; package?: string; version?: string } = () => ({ found: false });
 const pluginCompatEnabled = () => isNative && Store.get<boolean>('plugin_compat', true);
 function getCompat(): NodeCompat | null {
 	if (!isNative) return null;
@@ -52,6 +54,10 @@ function getCompat(): NodeCompat | null {
 			toast: m => toast(m),
 			openExternal: url => Native.openExternal({ url }),
 		});
+		// ffmpeg do "FFmpeg Plugin" do PojavLauncher para plugins como o Scene Recorder; sem ele o plugin mostra a tela própria de definir o ffmpeg
+		const nr = createNativeRunner((window as any).BBNativeProc, { toast: (m, ms) => toast(m, ms) });
+		ffmpegInfo = nr.info;
+		compat.setProcessRunner(nr.runner);
 	}
 	return compat;
 }
@@ -179,6 +185,8 @@ if (isNative) try {
 			enabled: () => pluginCompatEnabled(),
 			setEnabled: on => { Store.set('plugin_compat', on); if (on) getCompat()?.installGlobals(); },
 			hasAllFilesAccess: () => !!getCompat()?.hasAllFilesAccess(),
+			ffmpegStatus: () => { getCompat(); return ffmpegInfo(); },
+			openFfmpegPage: () => Native.openExternal({ url: 'https://github.com/PojavLauncherTeam/FFmpegPlugin' }),
 			requestAllFilesAccess: () => Native.requestAllFilesAccess(),
 			revokeAll: () => getCompat()?.revokeAll(),
 			permissionCount: () => Object.keys(getCompat()?.permissions() || {}).length,
