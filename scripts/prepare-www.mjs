@@ -36,7 +36,14 @@ const indexPath = 'www/index.html';
 let html = fs.readFileSync(indexPath, 'utf8');
 // viewport fixo: sem zoom de pinça (conflita com os controles de touch) e com viewport-fit=cover (preencher a tela)
 html = html.replace(/(<meta name="viewport" content=")[^"]*(")/i, '$1width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover$2');
-const snippet = `<script>try{if(localStorage.getItem('bb_android_force_desktop')==='1'){var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=1280, initial-scale='+(Math.min(screen.width,screen.height)/1280).toFixed(3)+', minimum-scale='+(Math.min(screen.width,screen.height)/1280).toFixed(3)+', maximum-scale='+(Math.min(screen.width,screen.height)/1280).toFixed(3)+', user-scalable=no, viewport-fit=cover');}}catch(e){}</script>`;
+const snippet = `<script>(function(){try{if(localStorage.getItem('bb_android_force_desktop')!=='1')return;
+function fit(){var m=document.querySelector('meta[name=viewport]');if(!m)return;var sc=(Math.min(screen.width,screen.height)/1280).toFixed(3);m.setAttribute('content','width=1280, initial-scale='+sc+', minimum-scale='+sc+', maximum-scale='+sc+', user-scalable=no, viewport-fit=cover');}
+fit();
+// se o WebView ignorar o viewport (ex.: tela em pé), tenta de novo e recarrega uma vez quando a largura virar a de desktop
+function check(){fit();setTimeout(function(){try{if(window.innerWidth>=900){sessionStorage.removeItem('bb_fd_retry');return;}
+if(!sessionStorage.getItem('bb_fd_retry')){sessionStorage.setItem('bb_fd_retry','1');fit();setTimeout(function(){if(window.innerWidth>=900)location.reload();},400);}}catch(e){}},250);}
+window.addEventListener('load',check);window.addEventListener('orientationchange',function(){setTimeout(fit,150);});
+}catch(e){}})();</script>`;
 if (!html.includes('bb_android_force_desktop')) {
   html = html.replace(/(<meta name="viewport"[^>]*>)/i, `$1\n\t${snippet}`);
   if (!html.includes('bb_android_force_desktop')) console.warn('viewport meta não encontrado em index.html');
