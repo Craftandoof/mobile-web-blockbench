@@ -4,6 +4,7 @@
  * arquivos .json trocam de mão entre os dois sem conversão.
  * Fonte: net.kdt.pojavlaunch.customcontrols.* (PojavLauncherTeam/PojavLauncher, ramo v3_openjdk)
  */
+import { t } from './i18n';
 
 export const SPECIAL = {
 	KEYBOARD: -1, TOGGLECTRL: -2, MOUSEPRI: -3, MOUSESEC: -4, VIRTUALMOUSE: -5,
@@ -11,15 +12,15 @@ export const SPECIAL = {
 } as const;
 
 export const SPECIAL_LIST: { code: number; name: string; label: string }[] = [
-	{ code: -1, name: 'Keyboard', label: 'Teclado' },
-	{ code: -2, name: 'GUI', label: 'Mostrar/ocultar controles (GUI)' },
-	{ code: -3, name: 'PRI', label: 'Mouse: botão esquerdo' },
-	{ code: -4, name: 'SEC', label: 'Mouse: botão direito' },
-	{ code: -5, name: 'Mouse', label: 'Mouse virtual (liga/desliga)' },
-	{ code: -6, name: 'MID', label: 'Mouse: botão do meio' },
-	{ code: -7, name: 'SCROLLUP', label: 'Rolar para cima' },
-	{ code: -8, name: 'SCROLLDOWN', label: 'Rolar para baixo' },
-	{ code: -9, name: 'MENU', label: 'Menu do app' },
+	{ code: -1, name: 'Keyboard', get label() { return t('Teclado'); } },
+	{ code: -2, name: 'GUI', get label() { return t('Mostrar/ocultar controles (GUI)'); } },
+	{ code: -3, name: 'PRI', get label() { return t('Mouse: botão esquerdo'); } },
+	{ code: -4, name: 'SEC', get label() { return t('Mouse: botão direito'); } },
+	{ code: -5, name: 'Mouse', get label() { return t('Mouse virtual (liga/desliga)'); } },
+	{ code: -6, name: 'MID', get label() { return t('Mouse: botão do meio'); } },
+	{ code: -7, name: 'SCROLLUP', get label() { return t('Rolar para cima'); } },
+	{ code: -8, name: 'SCROLLDOWN', get label() { return t('Rolar para baixo'); } },
+	{ code: -9, name: 'MENU', get label() { return t('Menu do app'); } },
 ];
 
 export type Orientation = 'DOWN' | 'LEFT' | 'UP' | 'RIGHT' | 'FREE';
@@ -82,7 +83,7 @@ export function newControl(p: Partial<ControlData> = {}): ControlData {
 	};
 }
 export function newDrawer(p: Partial<ControlData> = {}): DrawerData {
-	return { buttonProperties: [], properties: newControl({ name: 'Drawer', ...p }), orientation: 'LEFT' };
+	return { buttonProperties: [], properties: newControl({ name: t('Drawer'), ...p }), orientation: 'LEFT' };
 }
 export function newJoystick(p: Partial<ControlData> = {}): JoystickData {
 	return { ...newControl({ name: 'joystick', width: 130, height: 130, cornerRadius: 100, ...p }), forwardLock: false, absolute: false };
@@ -133,7 +134,7 @@ export interface PosVars { [k: string]: number }
 /** Mesma semântica do Pojav: ${var} → valor; depois + - * / ( ) e as funções dp() e px(). */
 export function evalDynamic(expr: string, vars: PosVars, dpr: number): number {
 	const text = String(expr).replace(/\$\{(\w+)\}/g, (_, name) => {
-		if (!(name in vars)) throw new Error('Variável desconhecida: ' + name);
+		if (!(name in vars)) throw new Error(t('Variável desconhecida: ') + name);
 		return '(' + vars[name] + ')';
 	});
 	let i = 0;
@@ -142,25 +143,25 @@ export function evalDynamic(expr: string, vars: PosVars, dpr: number): number {
 	function number(): number {
 		ws();
 		const m = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/i.exec(text.slice(i));
-		if (!m) throw new Error('Expressão inválida em: ' + text.slice(i, i + 12));
+		if (!m) throw new Error(t('Expressão inválida em: ') + text.slice(i, i + 12));
 		i += m[0].length;
 		return parseFloat(m[0]);
 	}
 	function primary(): number {
 		ws();
 		const c = peek();
-		if (c === '(') { i++; const v = sum(); ws(); if (peek() !== ')') throw new Error('Falta )'); i++; return v; }
+		if (c === '(') { i++; const v = sum(); ws(); if (peek() !== ')') throw new Error(t('Falta )')); i++; return v; }
 		if (c === '-') { i++; return -primary(); }
 		if (c === '+') { i++; return primary(); }
 		if (c && /[a-z]/i.test(c)) {
 			const m = /^[a-z_]\w*/i.exec(text.slice(i))!;
 			i += m[0].length;
 			ws();
-			if (peek() !== '(') throw new Error('Função inválida: ' + m[0]);
-			i++; const arg = sum(); ws(); if (peek() !== ')') throw new Error('Falta )'); i++;
+			if (peek() !== '(') throw new Error(t('Função inválida: ') + m[0]);
+			i++; const arg = sum(); ws(); if (peek() !== ')') throw new Error(t('Falta )')); i++;
 			if (m[0] === 'dp') return arg / dpr;   // px → dp
 			if (m[0] === 'px') return arg * dpr;   // dp → px
-			throw new Error('Função desconhecida: ' + m[0]);
+			throw new Error(t('Função desconhecida: ') + m[0]);
 		}
 		return number();
 	}
@@ -184,7 +185,7 @@ export function evalDynamic(expr: string, vars: PosVars, dpr: number): number {
 	}
 	const result = sum();
 	ws();
-	if (i < text.length) throw new Error('Sobrou texto na expressão: ' + text.slice(i, i + 12));
+	if (i < text.length) throw new Error(t('Sobrou texto na expressão: ') + text.slice(i, i + 12));
 	return result;
 }
 
@@ -220,11 +221,11 @@ function convertStrokeWidth(l: Layout, dpr: number) {
 export function parseLayout(input: string | object, dpr = 1, screenPx = { w: 1920, h: 1080 }): Layout {
 	let raw: any;
 	try { raw = typeof input === 'string' ? JSON.parse(input) : input; }
-	catch { throw new Error('Arquivo não é um JSON válido.'); }
-	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Formato de controles inválido.');
-	if (!('version' in raw)) throw new Error('Layout v1 do Pojav (sem "version") não é suportado.');
+	catch { throw new Error(t('Arquivo não é um JSON válido.')); }
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(t('Formato de controles inválido.'));
+	if (!('version' in raw)) throw new Error(t('Layout v1 do Pojav (sem "version") não é suportado.'));
 	const version = Number(raw.version);
-	if (!(version >= 2 && version <= 8)) throw new Error('Versão de layout não suportada: ' + raw.version);
+	if (!(version >= 2 && version <= 8)) throw new Error(t('Versão de layout não suportada: ') + raw.version);
 
 	const layout = newLayout();
 	layout.scaledAt = Number(raw.scaledAt) > 0 ? Number(raw.scaledAt) : 100;

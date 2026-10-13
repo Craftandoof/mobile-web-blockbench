@@ -1,5 +1,7 @@
 /** Menu flutuante do fork Android: botão ☰ arrastável + menus laterais empilhados. */
 import { Controls } from './touch_controls';
+import { t, LANGS, getLang, langChosen } from './i18n';
+import { runLanguageFlow } from './language_ui';
 import * as Input from './input_emulator';
 import { UI_CLASS } from './input_emulator';
 import { startEditing, openEditMenu, openProfilesDrawer } from './touch_editor';
@@ -107,21 +109,21 @@ function openMain() {
 	if (focusDrawer('main')) return;
 	const dr = openDrawer({ id: 'main', title: 'Blockbench Android' });
 	dr.body.append(
-		item('Enviar Input', () => openSendKeyboard(), { icon: '⌨', hint: 'Teclado completo: selecione teclas e envie o atalho de uma vez' }),
-		item('Abrir Configurações Persistentes', () => openSettings(), { icon: '⚙', hint: 'Menu flutuante, mouse, Keep Alive, tela cheia e controles de touch' }),
-		item('Forçar Encerramento', () => forceQuit(), { icon: '⏻', kind: 'danger', hint: 'Fecha o Blockbench e o serviço Keep Alive' }),
+		item(t('Enviar Input'), () => openSendKeyboard(), { icon: '⌨', hint: t('Teclado completo: selecione teclas e envie o atalho de uma vez') }),
+		item(t('Abrir Configurações Persistentes'), () => openSettings(), { icon: '⚙', hint: t('Menu flutuante, mouse, Keep Alive, tela cheia e controles de touch') }),
+		item(t('Forçar Encerramento'), () => forceQuit(), { icon: '⏻', kind: 'danger', hint: t('Fecha o Blockbench e o serviço Keep Alive') }),
 	);
 }
 
 async function forceQuit() {
 	const ok = await confirmDialog({
-		title: 'Forçar Encerramento',
-		message: 'O Blockbench e o serviço Keep Alive serão encerrados. Os projetos abertos ficam no backup automático e voltam na próxima abertura.',
-		confirmLabel: 'Encerrar', danger: true,
+		title: t('Forçar Encerramento'),
+		message: t('O Blockbench e o serviço Keep Alive serão encerrados. Os projetos abertos ficam no backup automático e voltam na próxima abertura.'),
+		confirmLabel: t('Encerrar'), danger: true,
 	});
 	if (!ok) return;
 	try { host.flush(); } catch { /* segue */ }
-	toast('Encerrando…', 1200);
+	toast(t('Encerrando…'), 1200);
 	setTimeout(() => { host.forceQuit().catch(() => window.close()); }, 450);
 }
 
@@ -129,123 +131,133 @@ async function forceQuit() {
 
 function openSettings() {
 	if (focusDrawer('settings')) return;
-	const dr = openDrawer({ id: 'settings', title: 'Configurações Persistentes' });
+	const dr = openDrawer({ id: 'settings', title: t('Configurações Persistentes') });
 	const draw = () => {
 		const B = dr.body;
 		const keepScroll = B.scrollTop;
 		B.replaceChildren();
 		B.append(
-			section('Menu flutuante'),
-			slider('Opacidade do Menu Flutuante', {
+			section(t('Menu flutuante')),
+			slider(t('Opacidade do Menu Flutuante'), {
 				min: 0, max: 100, value: Store.get<number>('fab_opacity', 100), format: v => v + '%',
 				onInput: v => { Store.set('fab_opacity', v); applyFabOpacity(); },
 			}),
-			hint('Em 0% o botão fica invisível, mas continua clicável (e arrastável) onde estiver.'),
-			slider('Tamanho do Menu Flutuante', {
+			hint(t('Em 0% o botão fica invisível, mas continua clicável (e arrastável) onde estiver.')),
+			slider(t('Tamanho do Menu Flutuante'), {
 				min: 30, max: 150, value: Store.get<number>('fab_size', 100), format: v => v + '%',
 				onInput: v => { Store.set('fab_size', v); applyFabSize(); },
 			}),
-			toggleItem('Menu flutuante deslizável', {
+			toggleItem(t('Menu flutuante deslizável'), {
 				value: fabDraggable(),
-				hint: 'Permite arrastar o botão ☰ para qualquer lugar da tela. Desligado, ele fica fixo no topo central',
+				hint: t('Permite arrastar o botão ☰ para qualquer lugar da tela. Desligado, ele fica fixo no topo central'),
 				onChange: on => { Store.set('fab_draggable', on); applyFabPos(); draw(); },
 			}),
-			...(fabDraggable() ? [item('Restaurar posição do menu flutuante', () => { Store.remove('fab_pos'); applyFabPos(); toast('Menu flutuante de volta ao topo central'); }, { icon: '⌖' })] : []),
+			...(fabDraggable() ? [item(t('Restaurar posição do menu flutuante'), () => { Store.remove('fab_pos'); applyFabPos(); toast(t('Menu flutuante de volta ao topo central')); }, { icon: '⌖' })] : []),
 
-			section('Mouse virtual'),
-			slider('Tamanho do Mouse', {
+			section(t('Mouse virtual')),
+			slider(t('Tamanho do Mouse'), {
 				min: 25, max: 150, value: Store.get<number>('mouse_size', 100), format: v => v + '%',
 				onInput: v => { Store.set('mouse_size', v); Input.setMouseSize(v / 100); },
 			}),
 
-			toggleItem('Rolagem com dois dedos no mouse virtual', {
+			toggleItem(t('Rolagem com dois dedos no mouse virtual'), {
 				value: Store.get<boolean>('pad_scroll', false),
-				hint: 'Desligado (padrão): só um dedo comanda o cursor; dedos extras são ignorados, sem zoom de pinça. Para rolar listas use os botões de rolagem do HUD',
+				hint: t('Desligado (padrão): só um dedo comanda o cursor; dedos extras são ignorados, sem zoom de pinça. Para rolar listas use os botões de rolagem do HUD'),
 				onChange: on => { Store.set('pad_scroll', on); Input.setTwoFingerScroll(on); },
 			}),
 
-			section('Processo'),
-			toggleItem('Desativar Keep Alive do Blockbench', {
+			section(t('Processo')),
+			toggleItem(t('Desativar Keep Alive do Blockbench'), {
 				value: !host.keepAliveEnabled(),
-				hint: 'Sem o serviço em primeiro plano o Android pode encerrar o app em segundo plano',
+				hint: t('Sem o serviço em primeiro plano o Android pode encerrar o app em segundo plano'),
 				onChange: async off => {
-					try { await host.setKeepAlive(!off); toast(off ? 'Keep Alive desativado' : 'Keep Alive ativado'); }
-					catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+					try { await host.setKeepAlive(!off); toast(off ? t('Keep Alive desativado') : t('Keep Alive ativado')); }
+					catch (e: any) { toast(t('Falha: ') + (e?.message || e), 3500); }
 				},
 			}),
 
-			section('Tela'),
-			toggleItem('Modo Tela Cheia (Android)', {
+			section(t('Tela')),
+			toggleItem(t('Modo Tela Cheia (Android)'), {
 				value: Store.get<boolean>('fullscreen', false),
-				hint: 'Esconde a barra de status e a de navegação; deslize da borda para vê-las',
+				hint: t('Esconde a barra de status e a de navegação; deslize da borda para vê-las'),
 				onChange: async on => {
 					Store.set('fullscreen', on);
-					try { await host.setFullscreen(on); } catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+					try { await host.setFullscreen(on); } catch (e: any) { toast(t('Falha: ') + (e?.message || e), 3500); }
 				},
 			}),
-			toggleItem('Preencher a tela inteira', {
+			toggleItem(t('Preencher a tela inteira'), {
 				value: Store.get<boolean>('fill_screen', false),
-				hint: 'Usa também a área do recorte da câmera (notch) e das bordas, sem a faixa preta. Algum botão do Blockbench pode ficar sob a câmera',
+				hint: t('Usa também a área do recorte da câmera (notch) e das bordas, sem a faixa preta. Algum botão do Blockbench pode ficar sob a câmera'),
 				onChange: async on => {
 					Store.set('fill_screen', on);
-					try { await host.setFillScreen(on); } catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+					try { await host.setFillScreen(on); } catch (e: any) { toast(t('Falha: ') + (e?.message || e), 3500); }
 				},
 			}),
-			toggleItem('Forçar Versão de Computador (Web)', {
+			toggleItem(t('Forçar Versão de Computador (Web)'), {
 				value: isForceDesktop(),
-				hint: 'Usa o layout de desktop do Blockbench em vez do layout para celular',
+				hint: t('Usa o layout de desktop do Blockbench em vez do layout para celular'),
 				onChange: async on => {
 					try { localStorage.setItem(FORCE_DESKTOP_KEY, on ? '1' : '0'); } catch { /* ok */ }
 					const ok = await confirmDialog({
-						title: 'Recarregar interface',
-						message: 'Para aplicar, o Blockbench precisa recarregar. Os projetos abertos voltam automaticamente.',
-						confirmLabel: 'Recarregar', cancelLabel: 'Depois',
+						title: t('Recarregar interface'),
+						message: t('Para aplicar, o Blockbench precisa recarregar. Os projetos abertos voltam automaticamente.'),
+						confirmLabel: t('Recarregar'), cancelLabel: t('Depois'),
 					});
 					if (ok) { try { host.flush(); } catch { /* ok */ } setTimeout(() => location.reload(), 500); }
-					else toast('Será aplicado na próxima abertura', 3000);
+					else toast(t('Será aplicado na próxima abertura'), 3000);
 				},
 			}),
 
-			section('Plugins desktop (Node)'),
-			toggleItem('Compatibilidade com plugins desktop', {
+			section(t('Plugins desktop (Node)')),
+			toggleItem(t('Compatibilidade com plugins desktop'), {
 				value: host.pluginCompat.enabled(),
-				hint: 'Libera na loja os plugins marcados "só no app" e emula fs, path, zlib, crypto e outros módulos do Node. Cada plugin pede permissão antes de acessar arquivos',
-				onChange: on => { host.pluginCompat.setEnabled(on); toast(on ? 'Plugins desktop liberados' : 'Plugins desktop bloqueados de novo'); draw(); },
+				hint: t('Libera na loja os plugins marcados "só no app" e emula fs, path, zlib, crypto e outros módulos do Node. Cada plugin pede permissão antes de acessar arquivos'),
+				onChange: on => { host.pluginCompat.setEnabled(on); toast(on ? t('Plugins desktop liberados') : t('Plugins desktop bloqueados de novo')); draw(); },
 			}),
-			item('Acesso a todos os arquivos', async () => {
-				if (host.pluginCompat.hasAllFilesAccess()) { toast('O acesso a todos os arquivos já está concedido'); return; }
-				try { await host.pluginCompat.requestAllFilesAccess(); toast('Ative "Permitir acesso a todos os arquivos" e volte ao app', 4500); }
-				catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
-			}, { icon: host.pluginCompat.hasAllFilesAccess() ? '✓' : '⚠', hint: host.pluginCompat.hasAllFilesAccess() ? 'Concedido: os plugins podem ler e gravar fora da pasta do app (se você permitir)' : 'Não concedido: sem isso os plugins só enxergam as pastas do próprio app. Toque para conceder' }),
-			item('FFmpeg (plugin do Pojav)', async () => {
+			item(t('Acesso a todos os arquivos'), async () => {
+				if (host.pluginCompat.hasAllFilesAccess()) { toast(t('O acesso a todos os arquivos já está concedido')); return; }
+				try { await host.pluginCompat.requestAllFilesAccess(); toast(t('Ative "Permitir acesso a todos os arquivos" e volte ao app'), 4500); }
+				catch (e: any) { toast(t('Falha: ') + (e?.message || e), 3500); }
+			}, { icon: host.pluginCompat.hasAllFilesAccess() ? '✓' : '⚠', hint: host.pluginCompat.hasAllFilesAccess() ? t('Concedido: os plugins podem ler e gravar fora da pasta do app (se você permitir)') : t('Não concedido: sem isso os plugins só enxergam as pastas do próprio app. Toque para conceder') }),
+			item(t('FFmpeg (plugin do Pojav)'), async () => {
 				const f = host.pluginCompat.ffmpegStatus();
-				if (f.found) { toast('FFmpeg encontrado: ' + f.path, 4500); return; }
-				try { await host.pluginCompat.openFfmpegPage(); } catch (e: any) { toast('Falha: ' + (e?.message || e), 3500); }
+				if (f.found) { toast(t('FFmpeg encontrado: ') + f.path, 4500); return; }
+				try { await host.pluginCompat.openFfmpegPage(); } catch (e: any) { toast(t('Falha: ') + (e?.message || e), 3500); }
 			}, (() => {
 				const f = host.pluginCompat.ffmpegStatus();
 				return f.found
-					? { icon: '✓', hint: `Encontrado (${f.package}${f.version ? ' ' + f.version : ''}). O Scene Recorder e outros plugins usam este ffmpeg automaticamente` }
-					: { icon: '⚠', hint: 'Não encontrado. Instale o "FFmpeg Plugin" do PojavLauncher (toque para abrir a página); sem ele o Scene Recorder mostra a tela dele para definir o ffmpeg' };
+					? { icon: '✓', hint: t('Encontrado ({0}). O Scene Recorder e outros plugins usam este ffmpeg automaticamente', f.package + (f.version ? ' ' + f.version : '')) }
+					: { icon: '⚠', hint: t('Não encontrado. Instale o "FFmpeg Plugin" do PojavLauncher (toque para abrir a página); sem ele o Scene Recorder mostra a tela dele para definir o ffmpeg') };
 			})()),
-			item('Revogar permissões dos plugins', async () => {
+			item(t('Revogar permissões dos plugins'), async () => {
 				const n = host.pluginCompat.permissionCount();
-				if (!n) { toast('Nenhum plugin tem permissão guardada'); return; }
-				if (await confirmDialog({ title: 'Revogar permissões', message: `${n} plugin(s) têm permissões guardadas (arquivos, rede, processos...). Eles vão perguntar de novo.`, confirmLabel: 'Revogar', danger: true })) { host.pluginCompat.revokeAll(); toast('Permissões revogadas'); draw(); }
-			}, { icon: '⛔', hint: `${host.pluginCompat.permissionCount()} plugin(s) com permissão guardada` }),
+				if (!n) { toast(t('Nenhum plugin tem permissão guardada')); return; }
+				if (await confirmDialog({ title: t('Revogar permissões'), message: t('{0} plugin(s) têm permissões guardadas (arquivos, rede, processos...). Eles vão perguntar de novo.', n), confirmLabel: t('Revogar'), danger: true })) { host.pluginCompat.revokeAll(); toast(t('Permissões revogadas')); draw(); }
+			}, { icon: '⛔', hint: t('{0} plugin(s) com permissão guardada', host.pluginCompat.permissionCount()) }),
 
-			section('Arquivos'),
-			toggleItem('Ignorar limitação de arquivo', {
+			section(t('Arquivos')),
+			toggleItem(t('Ignorar limitação de arquivo'), {
 				value: ignoreFileLimits(),
-				hint: 'O seletor lista qualquer tipo de arquivo e o Blockbench deixa de exigir a extensão esperada (.bbmodel, .js dos plugins etc.)',
-				onChange: on => { setIgnoreFileLimits(on); toast(on ? 'Limitação de arquivo ignorada' : 'Limitação de arquivo restaurada'); },
+				hint: t('O seletor lista qualquer tipo de arquivo e o Blockbench deixa de exigir a extensão esperada (.bbmodel, .js dos plugins etc.)'),
+				onChange: on => { setIgnoreFileLimits(on); toast(on ? t('Limitação de arquivo ignorada') : t('Limitação de arquivo restaurada')); },
 			}),
 
-			section('Controles de touch'),
-			item('Editar Perfil de Touch', () => { startEditing(); }, {
+			section(t('Controles de touch')),
+			item(t('Editar Perfil de Touch'), () => { startEditing(); }, {
 				icon: '✎',
-				hint: Controls.layout ? `Perfil ativo: ${Controls.profileName(Controls.activeId!)} — abre direto o modo de edição` : 'Nenhum perfil ativo — cria um e abre o modo de edição',
+				hint: Controls.layout ? t('Perfil ativo: {0} — abre direto o modo de edição', Controls.profileName(Controls.activeId!)) : t('Nenhum perfil ativo — cria um e abre o modo de edição'),
 			}),
-			item('Trocar Perfil de Touch', () => openProfilesDrawer(), { icon: '⇄', hint: 'Escolher, criar, importar ou exportar perfis' }),
+			item(t('Trocar Perfil de Touch'), () => openProfilesDrawer(), { icon: '⇄', hint: t('Escolher, criar, importar ou exportar perfis') }),
+
+			section(t('Teclado do Android')),
+			toggleItem(t('Abrir teclado automaticamente'), {
+				value: Store.get<boolean>('kb_auto', true),
+				hint: t('Desligado: o teclado só abre pelo botão de teclado. Com o ponteiro ativo ele nunca abre sozinho.'),
+				onChange: on => { Store.set('kb_auto', on); Input.setAutoKeyboard(on); },
+			}),
+
+			section(t('Idioma')),
+			item(t('Idioma do app'), () => { runLanguageFlow(false); }, { icon: '🌐', hint: LANGS.find(l => l.code === getLang())!.name }),
 		);
 		B.scrollTop = keepScroll;
 	};
@@ -264,18 +276,21 @@ export function initAndroidUi(h_: MenuHost) {
 	const start = () => {
 		injectStyle();
 		const root = getRoot();
-		fab = h('button', { id: 'bb-android-fab', class: UI_CLASS, 'aria-label': 'Menu do Blockbench Android' }, '☰');
+		fab = h('button', { id: 'bb-android-fab', class: UI_CLASS, 'aria-label': t('Menu do Blockbench Android') }, '☰');
 		root.appendChild(fab);
 		setupFabDrag();
 		applyFabOpacity();
 		applyFabSize();
 		Input.setMouseSize(Store.get<number>('mouse_size', 100) / 100);
 		Input.setTwoFingerScroll(Store.get<boolean>('pad_scroll', false));
+		Input.setAutoKeyboard(Store.get<boolean>('kb_auto', true));
 		window.addEventListener('resize', () => { applyScale(); applyFabPos(); });
 		document.addEventListener('bb-android-select', (e: any) => pickSelectOption(e.detail));
 		Controls.onMenu(() => { if (!drawerCount()) { if (Controls.editing) openEditMenu(); else openMain(); } });
 		Controls.subscribe(() => fab.classList.toggle('editing', Controls.editing));
 		Controls.init();
+		// primeira abertura: escolher o idioma é obrigatório (acontece uma única vez)
+		if (!langChosen()) runLanguageFlow(true);
 		// tela cheia: reaplica ao voltar para o app (o Android pode ter mostrado as barras)
 		if (Store.get<boolean>('fullscreen', false)) host.setFullscreen(true).catch(() => { /* sem suporte */ });
 		if (Store.get<boolean>('fill_screen', false)) host.setFillScreen(true).catch(() => { /* sem suporte */ });

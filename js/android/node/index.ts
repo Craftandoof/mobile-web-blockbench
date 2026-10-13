@@ -3,6 +3,7 @@
  * Espelha getPluginScopedRequire() do Blockbench desktop: módulos seguros saem direto, os demais pedem
  * permissão por plugin (guardada), e `fs` aceita `scope` (pasta) como no desktop.
  */
+import { t } from '../i18n';
 import { Buffer } from 'buffer/';
 import { createPath, PathModule } from './path';
 import { createFs, createScopedFs, NativeFs, NodeFs } from './fs';
@@ -73,11 +74,14 @@ export function createNodeCompat(nativeIn: NativeFs | undefined, host: CompatHos
 
 		roots = readRoots();
 		const label = plugin.name || plugin.title || plugin.id;
-		let what = DESCRIPTIONS[name] || `usar o módulo "${name}"`;
+		let what = DESCRIPTIONS[name] ? t(DESCRIPTIONS[name]) : t('usar o módulo "{0}"', name);
 		let extra = '';
-		if (name === 'fs' && options.scope) { what = 'acessar uma pasta'; extra = `\nPasta: ${options.scope.replace(/\n/g, '')}`; }
-		if (name === 'fs' && !roots.hasAll) extra += '\n\nObs.: o app ainda não tem "acesso a todos os arquivos". Ative em Configurações Persistentes > Plugins desktop.';
-		const text = `O plugin "${label}" (${plugin.id}) quer permissão para ${what}.${extra}${options.optional === false ? '\n\nEssa permissão é necessária para o plugin funcionar.' : ''}${options.message ? `\n\n"${options.message}"` : ''}\n\nOK = permitir sempre para este plugin\nCancelar = negar`;
+		if (name === 'fs' && options.scope) { what = t('acessar uma pasta'); extra = t('\nPasta: {0}', options.scope.replace(/\n/g, '')); }
+		if (name === 'fs' && !roots.hasAll) extra += t('\n\nObs.: o app ainda não tem "acesso a todos os arquivos". Ative em Configurações Persistentes > Plugins desktop.');
+		const text = t('O plugin "{0}" ({1}) quer permissão para {2}.', label, plugin.id, what) + extra
+			+ (options.optional === false ? t('\n\nEssa permissão é necessária para o plugin funcionar.') : '')
+			+ (options.message ? `\n\n"${options.message}"` : '')
+			+ t('\n\nOK = permitir sempre para este plugin\nCancelar = negar');
 		const allowed = host.confirm(text);
 		if (!allowed) { console.warn(`Acesso a "${name}" negado ao plugin ${plugin.id}`); return false; }
 		const p = loadPerms();

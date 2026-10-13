@@ -5,6 +5,7 @@
  *  2. flushes + auto-restores open projects so work survives the app being killed
  *  3. starts a foreground service that keeps the process alive in the background
  */
+import { t } from './i18n';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { initAndroidUi } from './android_menu';
 import { ignoreFileLimits, pickAnyFile } from './file_limits';
@@ -81,16 +82,16 @@ export const AndroidBridge = {
 				if (bytes.length === 0) {
 					// nunca criar um arquivo vazio em silêncio
 					console.warn('Exportação sem conteúdo', { name, savetype, type: typeof options.content });
-					toast('Nada foi salvo: o conteúdo gerado para "' + name + '" está vazio');
+					toast(t('Nada foi salvo: o conteúdo gerado para "{0}" está vazio', name));
 					return;
 				}
 				const res = await Native.saveFile({ name, mime: mimeFor(name), data: bytesToBase64(bytes), size: bytes.length });
 				if (res && res.cancelled) return;
-				if (res && typeof res.bytes === 'number' && res.bytes !== bytes.length) throw new Error(`foram gravados ${res.bytes} de ${bytes.length} bytes`);
+				if (res && typeof res.bytes === 'number' && res.bytes !== bytes.length) throw new Error(t('foram gravados {0} de {1} bytes', res.bytes, bytes.length));
 				if (typeof callback === 'function') callback((res && res.name) || name);
 			} catch (err: any) {
 				console.error('Android save failed', err);
-				toast('Falha ao salvar: ' + (err?.message || err), 5000);
+				toast(t('Falha ao salvar: ') + (err?.message || err), 5000);
 			}
 		})();
 		return true;

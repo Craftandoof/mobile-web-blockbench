@@ -391,6 +391,7 @@ export function wheel(deltaY: number, deltaX = 0) {
 
 export function setVirtualMouse(on: boolean) {
 	Mouse.virtual = on;
+	syncKbPolicy();
 	syncTouchpad();
 	ensureCursor();
 	updateCursor();
@@ -522,4 +523,29 @@ function ensureKb(): HTMLInputElement {
 export function toggleSoftKeyboard() {
 	const el = ensureKb();
 	if (document.activeElement === el) el.blur(); else el.focus();
+}
+
+
+// ------------------------------------------------------------------ abertura automática do teclado
+// O WebView abre o teclado do Android sempre que um campo de texto recebe foco. Com o ponteiro ativo, ou com a
+// opção "abrir teclado automaticamente" desligada, marcamos os campos com inputmode="none": o campo continua
+// recebendo foco e digitação (teclado físico / botão de teclado), mas o teclado virtual não aparece sozinho.
+let autoKeyboard = true;
+const NOKB = 'data-bb-nokb';
+export const autoKeyboardAllowed = () => autoKeyboard && !mouseActive();
+function applyKbPolicy(el: any) {
+	if (!el || !el.setAttribute || el.id === 'bb-android-kb' || !isEditable(el)) return;
+	if (autoKeyboardAllowed()) {
+		if (el.hasAttribute(NOKB)) { el.removeAttribute(NOKB); el.removeAttribute('inputmode'); }
+	} else if (!el.hasAttribute('inputmode') || el.hasAttribute(NOKB)) {
+		el.setAttribute('inputmode', 'none');
+		el.setAttribute(NOKB, '');
+	}
+}
+export function setAutoKeyboard(on: boolean) { autoKeyboard = on; syncKbPolicy(); }
+/** Reaplica a regra ao campo focado (chamada quando o ponteiro liga/desliga ou a opção muda). */
+export function syncKbPolicy() { applyKbPolicy(document.activeElement); }
+if (typeof document !== 'undefined') {
+	const pre = (e: Event) => applyKbPolicy(e.target);
+	for (const t of ['focusin', 'pointerdown', 'touchstart', 'mousedown']) document.addEventListener(t, pre, true);
 }

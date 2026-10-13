@@ -3,6 +3,7 @@
  * o combo é enviado de uma vez ao tocar em "Enviar tecla" (ex.: Ctrl + Shift + S).
  */
 import { KEYS } from './keymap';
+import { t } from './i18n';
 import * as Input from './input_emulator';
 import { h, openDrawer, focusDrawer, item, section, hint, toast } from './ui_kit';
 
@@ -49,7 +50,7 @@ const PAD: Cell[][] = [
 	[K('KP_0', 2), K('KP_DECIMAL'), G(1)],
 ];
 
-const labelOf = (name: string) => SHORT[name] || (LABEL_BY_GLFW[GLFW_BY_NAME[name]] ?? name);
+const labelOf = (name: string) => SHORT[name] || t(LABEL_BY_GLFW[GLFW_BY_NAME[name]] ?? name);
 
 export function sendCombo(keys: number[]) {
 	Input.refocusExternal();
@@ -65,7 +66,7 @@ export function sendCombo(keys: number[]) {
 
 export function openSendKeyboard() {
 	if (focusDrawer('send-input')) return;
-	const dr = openDrawer({ id: 'send-input', title: 'Enviar Input', wide: true });
+	const dr = openDrawer({ id: 'send-input', title: t('Enviar Input'), wide: true });
 	const B = dr.body;
 	let selected: number[] = [];
 	let keep = false;
@@ -77,7 +78,7 @@ export function openSendKeyboard() {
 	const refresh = () => {
 		combo.textContent = selected.length
 			? selected.map(k => SHORT[KEYS.find(x => x.glfw === k)?.name || ''] || LABEL_BY_GLFW[k] || String(k)).join(' + ')
-			: 'Nenhuma tecla selecionada — toque nas teclas e depois em "Enviar tecla"';
+			: t('Nenhuma tecla selecionada — toque nas teclas e depois em "Enviar tecla"');
 		for (const [k, els] of keyEls) els.forEach(el => el.classList.toggle('on', selected.includes(k)));
 	};
 	const toggle = (k: number) => {
@@ -116,7 +117,7 @@ export function openSendKeyboard() {
 	t2.addEventListener('click', () => show(2));
 
 	// texto livre
-	const input = h('input', { type: 'text', class: 'bbk-text', placeholder: 'Texto para enviar…', style: 'flex:1' });
+	const input = h('input', { type: 'text', class: 'bbk-text', placeholder: t('Texto para enviar…'), style: 'flex:1' });
 	const sendText = () => {
 		const t = input.value;
 		if (!t) return;
@@ -126,19 +127,19 @@ export function openSendKeyboard() {
 	};
 	input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendText(); } });
 
-	const keepChip = h('button', { class: 'bbk-chip' }, 'Manter seleção após enviar');
+	const keepChip = h('button', { class: 'bbk-chip' }, t('Manter seleção após enviar'));
 	keepChip.addEventListener('click', () => { keep = !keep; keepChip.classList.toggle('on', keep); });
 
 	B.append(
-		section('Texto'),
-		h('div', { class: 'bbk-actions-row', style: 'margin:0 0 4px' }, input, item('Enviar texto', sendText, { icon: '➤' })),
-		section('Teclas'),
-		hint('Toque nas teclas para selecioná-las (ficam destacadas, sem enviar). Depois toque em "Enviar tecla" para enviar todas juntas.'),
+		section(t('Texto')),
+		h('div', { class: 'bbk-actions-row', style: 'margin:0 0 4px' }, input, item(t('Enviar texto'), sendText, { icon: '➤' })),
+		section(t('Teclas')),
+		hint(t('Toque nas teclas para selecioná-las (ficam destacadas, sem enviar). Depois toque em "Enviar tecla" para enviar todas juntas.')),
 		tabs, pane, combo,
 		h('div', { class: 'bbk-actions-row' },
-			item('Limpar', () => { selected = []; refresh(); }, { icon: '✕' }),
-			item('Enviar tecla', () => {
-				if (!selected.length) { toast('Selecione ao menos uma tecla'); return; }
+			item(t('Limpar'), () => { selected = []; refresh(); }, { icon: '✕' }),
+			item(t('Enviar tecla'), () => {
+				if (!selected.length) { toast(t('Selecione ao menos uma tecla')); return; }
 				sendCombo(selected);
 				if (!keep) { selected = []; refresh(); }
 			}, { icon: '➤', kind: 'primary' })),

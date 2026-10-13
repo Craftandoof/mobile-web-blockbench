@@ -8,6 +8,7 @@ import {
 	argbToCss, evalDynamic, parseLayout, serializeLayout, LAYOUT_VERSION,
 } from './pojav_format';
 import { DEFAULT_LAYOUT_JSON } from './default_layout';
+import { t } from './i18n';
 import { installTouchGuard } from './touch_guard';
 import * as Input from './input_emulator';
 import { UI_CLASS } from './input_emulator';
@@ -104,7 +105,7 @@ function evalPos(expr: string, d: ControlData): number {
 		}, m.dpr);
 		return px / m.pxPerCss;
 	} catch (e) {
-		console.warn('Expressão de posição inválida:', expr, e);
+		console.warn(t('Expressão de posição inválida:'), expr, e);
 		return 0;
 	}
 }

@@ -1,0 +1,13 @@
+diff --git a/js/api.ts b/js/api.ts
+index 490d44ae..65e3f9a7 100644
+--- a/js/api.ts
++++ b/js/api.ts
+@@ -332,6 +332,8 @@ export const Blockbench = {
+ 		if (ui_mode == 'desktop') Blockbench.isMobile = false;
+ 		if (ui_mode == 'mobile') Blockbench.isMobile = true;
+ 	} catch (err) {}
++	// Android: "Forçar Versão de Computador" tem prioridade, inclusive com a tela em pé
++	try { if (localStorage.getItem('bb_android_force_desktop') === '1') Blockbench.isMobile = false; } catch (err) {}
+ })();
+ 
+ if (isApp) {

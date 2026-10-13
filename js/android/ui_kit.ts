@@ -1,5 +1,6 @@
 /** Kit de interface do fork Android: tudo em DOM puro, sem depender do Vue do Blockbench. */
 import { UI_CLASS, uiScale } from './input_emulator';
+import { t } from './i18n';
 export { uiScale };
 
 // ------------------------------------------------------------------ armazenamento persistente (localStorage)
@@ -231,7 +232,7 @@ export function closeDrawer(id: string) {
 export function openDrawer(opts: DrawerOpts): Drawer {
 	const side = opts.side || 'left';
 	const modal = opts.modal !== false;
-	const closeBtn = h('button', { class: 'bbk-icon', 'aria-label': 'Fechar' }, stack.length ? '‹' : '✕');
+	const closeBtn = h('button', { class: 'bbk-icon', 'aria-label': t('Fechar') }, stack.length ? '‹' : '✕');
 	const title = h('h2', {}, opts.title);
 	const body = h('div', { class: 'bbk-body' });
 	const panel = h('aside', { class: 'bbk-drawer ' + side + (opts.wide ? ' wide' : '') }, h('div', { class: 'bbk-head' }, closeBtn, title), body);
@@ -376,7 +377,7 @@ export function confirmDialog(o: { title: string; message: string; confirmLabel?
 			h('div', {},
 				h('h3', {}, o.title), h('p', {}, o.message),
 				h('div', { class: 'bbk-actions' },
-					item(o.cancelLabel || 'Cancelar', () => done(false)),
+					item(o.cancelLabel || t('Cancelar'), () => done(false)),
 					item(o.confirmLabel || 'OK', () => done(true), { kind: o.danger ? 'danger' : 'primary' }))));
 		getRoot().appendChild(modal);
 	});
@@ -389,7 +390,7 @@ export function promptDialog(o: { title: string; value?: string; placeholder?: s
 		const modal = h('div', { class: 'bbk-modal ' + UI_CLASS },
 			h('div', {}, h('h3', {}, o.title), h('p', {}, input),
 				h('div', { class: 'bbk-actions' },
-					item('Cancelar', () => done(null)),
+					item(t('Cancelar'), () => done(null)),
 					item(o.confirmLabel || 'OK', () => done(input.value.trim() || null), { kind: 'primary' }))));
 		getRoot().appendChild(modal);
 		setTimeout(() => input.focus(), 50);
@@ -413,7 +414,7 @@ export function pickSelectOption(sel: HTMLSelectElement) {
 		});
 		list.append(b);
 	}
-	const modal = h('div', { class: 'bbk-modal ' + UI_CLASS }, h('div', {}, list, h('div', { class: 'bbk-actions' }, item('Cancelar', done))));
+	const modal = h('div', { class: 'bbk-modal ' + UI_CLASS }, h('div', {}, list, h('div', { class: 'bbk-actions' }, item(t('Cancelar'), done))));
 	modal.addEventListener('click', e => { if (e.target === modal) done(); });
 	getRoot().appendChild(modal);
 }

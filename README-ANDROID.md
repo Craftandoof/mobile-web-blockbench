@@ -75,6 +75,13 @@ Código em `js/android/` (carregado só dentro do app Android):
 3. `git add -A && git commit && git push` — o workflow **Build Android APK** roda sozinho e também por "Run workflow". O APK sai em Artifacts.
 4. Local (opcional): `npm install` → `npm run android:add` (1ª vez) → `npm run android:sync` → `cd android && ./gradlew assembleDebug`.
 
+## Novidades desta versão
+
+- **Gravação (Scene Recorder / ffmpeg):** o envio dos quadros para o stdin do ffmpeg agora tem contrapressão (fila no JS, blocos de 256 KB, só envia quando o lado nativo esvazia — `NativeProc.pending`), a fila nativa tem limite (64 MB) e erros de escrita não lançam mais exceção sem ouvinte (era uma causa provável do crash). Se o ffmpeg terminar com erro, um aviso mostra as últimas linhas do erro dele.
+- **Forçar Versão de Computador em retrato:** `patches/js_api.ts.patch` faz `Blockbench.isMobile = false` quando a opção está ligada (antes só o viewport era trocado) e o viewport ganhou `minimum-scale`.
+- **Teclado:** campos de texto recebem `inputmode="none"` quando o ponteiro está ativo ou quando "Abrir teclado automaticamente" está desligada (Configurações Persistentes > Teclado do Android). O botão de teclado continua abrindo o teclado.
+- **Idiomas (`i18n.ts`, `i18n_dict.ts`, `language_ui.ts`):** padrão inglês; pt-BR, espanhol, russo e chinês. Na primeira abertura a escolha é obrigatória e pergunta se vale para o app inteiro (também troca o idioma do Blockbench e recarrega) ou só para o menu. Depois: Configurações Persistentes > Idioma. Para adicionar um texto novo: use `t('texto em pt-BR')` e inclua a tradução em `i18n_dict.ts`.
+
 ## Limites conhecidos / a testar no aparelho
 - O seletor de salvar do Android nunca sobrescreve: se `player.jem` já existir na pasta, ele cria `player (1).jem`.
 - O botão Voltar do Android fecha a Activity (a sessão volta pelo backup, mas o estado ao vivo se perde).

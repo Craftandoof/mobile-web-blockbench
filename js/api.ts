@@ -332,6 +332,8 @@ export const Blockbench = {
 		if (ui_mode == 'desktop') Blockbench.isMobile = false;
 		if (ui_mode == 'mobile') Blockbench.isMobile = true;
 	} catch (err) {}
+	// Android: "Forçar Versão de Computador" tem prioridade, inclusive com a tela em pé
+	try { if (localStorage.getItem('bb_android_force_desktop') === '1') Blockbench.isMobile = false; } catch (err) {}
 })();
 
 if (isApp) {

@@ -26,7 +26,7 @@ public class KeepAliveService extends Service {
 
         Notification n = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Blockbench")
-            .setContentText("Sessão ativa em segundo plano")
+            .setContentText(sessionText())
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setOngoing(true)
             .setContentIntent(pi)
@@ -42,10 +42,20 @@ public class KeepAliveService extends Service {
         return START_NOT_STICKY;
     }
 
+    /** Texto da notificação no idioma do sistema (inglês por padrão). */
+    private static String sessionText() {
+        String l = java.util.Locale.getDefault().getLanguage();
+        if ("pt".equals(l)) return "Sessão ativa em segundo plano";
+        if ("es".equals(l)) return "Sesión activa en segundo plano";
+        if ("ru".equals(l)) return "Сеанс работает в фоне";
+        if ("zh".equals(l)) return "会话正在后台运行";
+        return "Session active in the background";
+    }
+
     private void createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID, "Sessão em segundo plano", NotificationManager.IMPORTANCE_LOW);
+                CHANNEL_ID, sessionText(), NotificationManager.IMPORTANCE_LOW);
             getSystemService(NotificationManager.class).createNotificationChannel(ch);
         }
     }

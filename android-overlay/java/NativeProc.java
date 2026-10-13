@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -45,10 +46,13 @@ public class NativeProc {
         final LinkedBlockingQueue<byte[]> inQueue = new LinkedBlockingQueue<>();
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final ByteArrayOutputStream err = new ByteArrayOutputStream();
+        final AtomicLong pending = new AtomicLong();
+        volatile boolean broken = false;
         volatile Integer exit = null;
     }
 
     private static final byte[] EOF = new byte[0];
+    private static final long MAX_PENDING = 64L * 1024 * 1024;
 
     private static String err(String code, String msg) { return "E:" + code + ":" + (msg == null ? "" : msg); }
 
@@ -159,10 +163,16 @@ public class NativeProc {
                         while (true) {
                             byte[] chunk = p.inQueue.take();
                             if (chunk == EOF) break;
-                            p.stdin.write(chunk);
+                            try {
+                                if (!p.broken) p.stdin.write(chunk);
+                            } catch (IOException io) {
+                                p.broken = true;      // ffmpeg fechou o stdin: descarta o resto sem deixar a fila crescer
+                            } finally {
+                                p.pending.addAndGet(-chunk.length);
+                            }
                         }
                         p.stdin.flush();
-                    } catch (Exception ignored) { /* ffmpeg fechou o stdin */ }
+                    } catch (Exception ignored) { /* interrompido */ }
                     try { p.stdin.close(); } catch (Exception ignored) { }
                 }
             }, "bb-proc-stdin");
@@ -174,6 +184,8 @@ public class NativeProc {
                     int code = -1;
                     try { code = p.process.waitFor(); } catch (InterruptedException ignored) { }
                     try { Thread.sleep(80); } catch (InterruptedException ignored) { }   // deixa os pumps esvaziarem
+                    p.broken = true;
+                    p.inQueue.offer(EOF);
                     p.exit = code;
                 }
             }, "bb-proc-wait");
@@ -198,8 +210,22 @@ public class NativeProc {
     public String write(String id, String base64) {
         Proc p = get(id);
         if (p == null) return err("ENOENT", "processo inexistente");
-        try { p.inQueue.put(Base64.decode(base64, Base64.DEFAULT)); return "O"; }
-        catch (Exception e) { return err("EIO", String.valueOf(e.getMessage())); }
+        if (p.broken) return err("EPIPE", "o ffmpeg fechou a entrada");
+        if (p.pending.get() > MAX_PENDING) return err("EAGAIN", "fila de entrada cheia");
+        try {
+            byte[] data = Base64.decode(base64, Base64.DEFAULT);
+            p.pending.addAndGet(data.length);
+            p.inQueue.put(data);
+            return "O";
+        } catch (Exception e) { return err("EIO", String.valueOf(e.getMessage())); }
+    }
+
+    /** Bytes ainda não entregues ao ffmpeg (o JavaScript usa isso para não enviar mais rápido do que ele consome). */
+    @JavascriptInterface
+    public String pending(String id) {
+        Proc p = get(id);
+        if (p == null) return err("ENOENT", "processo inexistente");
+        return "O" + p.pending.get();
     }
 
     @JavascriptInterface

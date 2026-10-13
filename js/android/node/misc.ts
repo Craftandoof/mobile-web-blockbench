@@ -1,4 +1,5 @@
 /** Módulos de Node (além de fs e path) que os plugins desktop usam, adaptados ao WebView do Android. */
+import { t } from '../i18n';
 import { Buffer } from 'buffer/';
 import type { BufferEncoding } from './fs';
 // @ts-ignore (pako 1.x não traz tipos)
@@ -379,8 +380,8 @@ export interface ShellHost { toast(msg: string): void; openExternal(url: string)
 export function createShell(host: ShellHost, rm: (p: string) => void) {
 	return {
 		openExternal: (url: string) => host.openExternal(String(url)),
-		showItemInFolder: (p: string) => { host.toast('Arquivo: ' + p); },
-		openPath: async (p: string) => { host.toast('Abra manualmente: ' + p); return ''; },
+		showItemInFolder: (p: string) => { host.toast(t('Arquivo: ') + p); },
+		openPath: async (p: string) => { host.toast(t('Abra manualmente: ') + p); return ''; },
 		trashItem: async (p: string) => { rm(p); },
 		beep() {},
 	};
