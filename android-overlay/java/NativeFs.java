@@ -241,4 +241,66 @@ public class NativeFs {
             return "O" + f.getPath();
         } catch (Throwable t) { return fail(t); }
     }
+
+    /** Lista uma pasta com tipo, tamanho e data: O[["nome","d"|"f",tamanho,mtime],...] (usado pelo gerenciador de arquivos). */
+    @JavascriptInterface
+    public String listdir(String path) {
+        try {
+            File f = resolve(path);
+            if (!f.exists()) return err("ENOENT", path);
+            if (!f.isDirectory()) return err("ENOTDIR", path);
+            File[] list = f.listFiles();
+            if (list == null) return err("EACCES", path);
+            JSONArray arr = new JSONArray();
+            for (File c : list) {
+                JSONArray e = new JSONArray();
+                e.put(c.getName());
+                e.put(c.isDirectory() ? "d" : "f");
+                e.put(c.isDirectory() ? 0 : c.length());
+                e.put(c.lastModified());
+                arr.put(e);
+            }
+            return "O" + arr.toString();
+        } catch (Throwable t) { return fail(t); }
+    }
+
+    /** Lê um trecho (base64) de um arquivo: para arquivos grandes, sem carregar tudo de uma vez. */
+    @JavascriptInterface
+    public String readChunk(String path, String offset, String length) {
+        try {
+            File f = resolve(path);
+            if (!f.exists()) return err("ENOENT", path);
+            if (f.isDirectory()) return err("EISDIR", path);
+            long off = Long.parseLong(offset);
+            int len = (int) Math.min(Long.parseLong(length), 4L * 1024 * 1024);
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "r")) {
+                if (off >= raf.length()) return "O";
+                raf.seek(off);
+                byte[] buf = new byte[(int) Math.min(len, raf.length() - off)];
+                raf.readFully(buf);
+                return "O" + Base64.encodeToString(buf, Base64.NO_WRAP);
+            }
+        } catch (Throwable t) { return fail(t); }
+    }
+
+    /** Pastas de usuário que existem: O{"downloads":"...","documents":"...",...} */
+    @JavascriptInterface
+    public String userDirs() {
+        try {
+            JSONObject o = new JSONObject();
+            String[][] dirs = {
+                { "downloads", Environment.DIRECTORY_DOWNLOADS }, { "documents", Environment.DIRECTORY_DOCUMENTS },
+                { "pictures", Environment.DIRECTORY_PICTURES }, { "dcim", Environment.DIRECTORY_DCIM },
+                { "movies", Environment.DIRECTORY_MOVIES }, { "music", Environment.DIRECTORY_MUSIC },
+            };
+            for (String[] d : dirs) {
+                File f = Environment.getExternalStoragePublicDirectory(d[1]);
+                if (f != null) o.put(d[0], f.getPath());
+            }
+            File ext = ctx.getExternalFilesDir(null);
+            if (ext != null) o.put("app", ext.getCanonicalPath());
+            o.put("internal", Environment.getExternalStorageDirectory().getPath());
+            return "O" + o.toString();
+        } catch (Throwable t) { return fail(t); }
+    }
 }

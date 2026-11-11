@@ -12,11 +12,12 @@ export const ignoreFileLimits = (): boolean => Store.get<boolean>(KEY, false);
 export const setIgnoreFileLimits = (on: boolean) => Store.set(KEY, on);
 
 /** Abre o seletor de arquivos sem nenhum filtro de tipo. */
-export function pickAnyFile(multiple: boolean, cb: (files: File[]) => void) {
+export function pickAnyFile(multiple: boolean, cb: (files: File[]) => void, accept?: string) {
 	const input = document.createElement('input');
 	input.type = 'file';
 	input.multiple = multiple;
 	// sem atributo accept: o Android lista todos os arquivos
+	if (accept) input.accept = accept;
 	input.style.cssText = 'position:fixed;left:-999px;top:-999px;opacity:0';
 	input.addEventListener('change', () => {
 		const files = Array.from(input.files || []);

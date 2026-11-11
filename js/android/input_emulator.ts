@@ -337,8 +337,10 @@ export function mouseDown(btn: MouseBtn) {
 	if (btn === 'left' && !md.defaultPrevented) {
 		const f = (t.closest && t.closest(FOCUSABLE)) as HTMLElement | null;
 		const active = document.activeElement as HTMLElement | null;
-		if (f && f !== active) { try { f.focus({ preventScroll: true }); } catch { /* ok */ } }
-		else if (!f && active && active !== document.body && isEditable(active)) active.blur();
+		// com o teclado aberto pelo botão, o clique na tela NÃO fecha o teclado: só campos de texto recebem o foco e
+		// clicar em área vazia mantém o campo (e o teclado) como estão
+		if (f && f !== active && (!kbOpen || isEditable(f))) { try { f.focus({ preventScroll: true }); } catch { /* ok */ } }
+		else if (!f && active && active !== document.body && isEditable(active) && !kbOpen) active.blur();
 		if (f && f.tagName === 'INPUT' && (f as HTMLInputElement).type === 'range') { rangeDrag = f as HTMLInputElement; setRangeFromPointer(rangeDrag); }
 	}
 }
@@ -520,10 +522,54 @@ function ensureKb(): HTMLInputElement {
 	kbEl = el;
 	return el;
 }
-export function toggleSoftKeyboard() {
-	const el = ensureKb();
-	if (document.activeElement === el) el.blur(); else el.focus();
+/** True enquanto o teclado foi aberto pelo botão de teclado do app. */
+let kbOpen = false;
+export const softKeyboardOpen = () => kbOpen;
+
+/** Campo de texto do Blockbench que deve receber a digitação: o focado, ou o último que foi focado. */
+function editableTarget(): HTMLElement | null {
+	const a = document.activeElement as HTMLElement | null;
+	if (a && a.id !== 'bb-android-kb' && !isUi(a) && isEditable(a)) return a;
+	if (lastFocus && lastFocus.isConnected && isEditable(lastFocus)) return lastFocus;
+	return null;
 }
+function refocus(f: HTMLElement) {
+	const ta = f as any;
+	let s: number | null = null, e: number | null = null;
+	try { s = ta.selectionStart; e = ta.selectionEnd; } catch { /* campos sem seleção */ }
+	if (document.activeElement === f) f.blur();
+	try { f.focus({ preventScroll: true }); } catch { /* ok */ }
+	try { if (s !== null && e !== null) ta.setSelectionRange(s, e); } catch { /* ok */ }
+}
+function openSoftKeyboard() {
+	kbOpen = true;
+	baseH = Math.max(baseH, window.innerHeight);
+	sawShrink = false;
+	const f = editableTarget();
+	if (f) {
+		// o próprio campo recebe o teclado: o que você digita vai direto nele
+		if (f.hasAttribute(NOKB)) { f.removeAttribute(NOKB); f.removeAttribute('inputmode'); }
+		refocus(f);
+	} else ensureKb().focus();
+}
+function closeSoftKeyboard() {
+	kbOpen = false;
+	const a = document.activeElement as HTMLElement | null;
+	if (a && a.id === 'bb-android-kb') { a.blur(); return; }
+	const f = editableTarget();
+	if (f) { applyKbPolicy(f); refocus(f); }
+}
+export function toggleSoftKeyboard() {
+	if (kbOpen) closeSoftKeyboard(); else openSoftKeyboard();
+}
+// se o usuário esconder o teclado pelo próprio Android (botão voltar), o próximo toque no botão volta a abri-lo
+let baseH = 0, sawShrink = false;
+if (typeof window !== 'undefined') window.addEventListener('resize', () => {
+	baseH = Math.max(baseH, window.innerHeight);
+	if (!kbOpen) return;
+	if (window.innerHeight < baseH - 120) sawShrink = true;
+	else if (sawShrink && window.innerHeight >= baseH - 40) { kbOpen = false; sawShrink = false; }
+});
 
 
 // ------------------------------------------------------------------ abertura automática do teclado
@@ -532,7 +578,7 @@ export function toggleSoftKeyboard() {
 // recebendo foco e digitação (teclado físico / botão de teclado), mas o teclado virtual não aparece sozinho.
 let autoKeyboard = true;
 const NOKB = 'data-bb-nokb';
-export const autoKeyboardAllowed = () => autoKeyboard && !mouseActive();
+export const autoKeyboardAllowed = () => kbOpen || (autoKeyboard && !mouseActive());
 function applyKbPolicy(el: any) {
 	if (!el || !el.setAttribute || el.id === 'bb-android-kb' || !isEditable(el)) return;
 	if (autoKeyboardAllowed()) {

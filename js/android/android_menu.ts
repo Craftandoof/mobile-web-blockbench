@@ -1,4 +1,5 @@
 /** Menu flutuante do fork Android: botão ☰ arrastável + menus laterais empilhados. */
+import { fileManagerEnabled, setFileManagerEnabled, openFileManager } from './file_manager';
 import { Controls } from './touch_controls';
 import { t, LANGS, getLang, langChosen } from './i18n';
 import { runLanguageFlow } from './language_ui';
@@ -109,6 +110,7 @@ function openMain() {
 	if (focusDrawer('main')) return;
 	const dr = openDrawer({ id: 'main', title: 'Blockbench Android' });
 	dr.body.append(
+		item(t('Gerenciador de arquivos'), () => { openFileManager({ mode: 'browse' }); }, { icon: '📁', hint: t('Navegar, criar pastas, renomear e excluir arquivos do aparelho') }),
 		item(t('Enviar Input'), () => openSendKeyboard(), { icon: '⌨', hint: t('Teclado completo: selecione teclas e envie o atalho de uma vez') }),
 		item(t('Abrir Configurações Persistentes'), () => openSettings(), { icon: '⚙', hint: t('Menu flutuante, mouse, Keep Alive, tela cheia e controles de touch') }),
 		item(t('Forçar Encerramento'), () => forceQuit(), { icon: '⏻', kind: 'danger', hint: t('Fecha o Blockbench e o serviço Keep Alive') }),
@@ -240,6 +242,12 @@ function openSettings() {
 				value: ignoreFileLimits(),
 				hint: t('O seletor lista qualquer tipo de arquivo e o Blockbench deixa de exigir a extensão esperada (.bbmodel, .js dos plugins etc.)'),
 				onChange: on => { setIgnoreFileLimits(on); toast(on ? t('Limitação de arquivo ignorada') : t('Limitação de arquivo restaurada')); },
+			}),
+
+			toggleItem(t('Gerenciador de arquivos do app'), {
+				value: fileManagerEnabled(),
+				hint: t('Ao abrir e salvar arquivos usa o gerenciador do app (pastas, nome, renomear, excluir) em vez do seletor do Android. Desligado: usa o seletor do Android.'),
+				onChange: on => { setFileManagerEnabled(on); toast(on ? t('Gerenciador de arquivos do app ligado') : t('Usando o seletor do Android')); },
 			}),
 
 			section(t('Controles de touch')),

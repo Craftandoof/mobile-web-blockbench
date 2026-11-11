@@ -91,3 +91,10 @@ Código em `js/android/` (carregado só dentro do app Android):
 - `specialUse` exige justificativa se um dia for para a Play Store; para sideload não.
 - `androidScheme: https` define a origem do IndexedDB — mudar depois faz os backups antigos "sumirem".
 - Fase 2 (toque, drawers, modificadores virtuais) ainda não iniciada.
+
+## Novidades (salvamento, teclado, ponteiro, gerenciador de arquivos)
+
+- **Arquivos vazios / crash ao salvar modelos grandes:** o conteúdo agora vai em pedaços de 384 KB para um arquivo temporário nativo (`BBNativeStage`) e só então abre o seletor; o salvamento termina a partir desse arquivo mesmo se o Android recriar a tela com o seletor aberto (antes o arquivo era criado vazio). O backup automático não repete se nada mudou e não roda durante um salvamento.
+- **Gerenciador de arquivos do app** (`js/android/file_manager.ts`): abrir/salvar com pastas, nome, atalhos, ordenação, filtro por extensão, criar pasta, renomear e excluir. Usa `BBNativeFs` (com "acesso a todos os arquivos" vê o aparelho todo). Dá para voltar ao seletor do Android pelo botão do topo ou desligar em Configurações Persistentes. Também abre pelo menu ☰ ("Gerenciador de arquivos").
+- **Teclado:** o botão de teclado abre o teclado no próprio campo focado (a digitação vai direto nele) e clicar na tela com o ponteiro não fecha mais o teclado; ele só fecha pelo botão (ou pelo botão voltar do Android).
+- **Ponteiro:** toques reais novos nunca chegam ao Blockbench com o mouse ativo, mesmo se a camada do touchpad falhar ao trocar de modo, e cliques de compatibilidade nascidos no touchpad são barrados.

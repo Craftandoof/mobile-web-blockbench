@@ -43,3 +43,29 @@ export function bytesToBase64(bytes: Uint8Array): string {
 	for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK) as any);
 	return btoa(bin);
 }
+
+// ---- envio em pedaços para o arquivo temporário nativo (BBNativeStage)
+export interface StageApi { begin(): string; append(id: string, b64: string): string; size(id: string): string; discard(id: string): string }
+export const stageApi = (): StageApi | null => (typeof window !== 'undefined' && (window as any).BBNativeStage) || null;
+
+const ok = (r: string): string => {
+	if (typeof r !== 'string' || r[0] !== 'O') throw new Error(typeof r === 'string' && r.startsWith('E:') ? r.split(':').slice(2).join(':') : t('resposta inválida do módulo nativo'));
+	return r.slice(1);
+};
+
+/** Grava os bytes no arquivo temporário nativo, em pedaços de 384 KB (nunca um base64 gigante de uma vez). Devolve o id. */
+export function stageBytes(bytes: Uint8Array): string {
+	const api = stageApi();
+	if (!api) throw new Error(t('módulo nativo de preparo indisponível'));
+	const id = ok(api.begin());
+	try {
+		const STEP = 384 * 1024;
+		for (let i = 0; i < bytes.length; i += STEP) ok(api.append(id, bytesToBase64(bytes.subarray(i, i + STEP))));
+		if (Number(ok(api.size(id))) !== bytes.length) throw new Error(t('o arquivo temporário ficou com tamanho diferente'));
+		return id;
+	} catch (e) {
+		try { api.discard(id); } catch { /* ok */ }
+		throw e;
+	}
+}
+export const discardStage = (id: string) => { try { stageApi()?.discard(id); } catch { /* ok */ } };

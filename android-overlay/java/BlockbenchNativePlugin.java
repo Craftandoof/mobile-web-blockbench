@@ -45,6 +45,8 @@ public class BlockbenchNativePlugin extends Plugin {
         try {
             getBridge().getWebView().addJavascriptInterface(new NativeFs(getContext()), "BBNativeFs");
             getBridge().getWebView().addJavascriptInterface(new NativeProc(getContext()), "BBNativeProc");
+            getBridge().getWebView().addJavascriptInterface(new NativeStage(getContext()), "BBNativeStage");
+            NativeStage.sweep(getContext(), prefs().getString("stage", null));
         } catch (Exception ignored) { /* sem WebView: o JS avisa que o acesso nativo não existe */ }
     }
 
@@ -89,14 +91,33 @@ public class BlockbenchNativePlugin extends Plugin {
     }
 
     // ---------- Native save dialog (SAF) with the real file name ----------
+    // O conteúdo vai primeiro para um arquivo temporário do app (BBNativeStage, em pedaços) e o que fica pendente é
+    // guardado em SharedPreferences. Se o Android recriar a tela enquanto o seletor está aberto, o PluginCall se perde,
+    // mas o salvamento ainda termina a partir do arquivo temporário (antes o arquivo era criado vazio).
+    private android.content.SharedPreferences prefs() { return getContext().getSharedPreferences("bb_native_pending", Context.MODE_PRIVATE); }
+
     @PluginMethod
     public void saveFile(PluginCall call) {
         String name = call.getString("name", "file");
         String mime = call.getString("mime", "application/octet-stream");
-        if (call.getString("data") == null) {
-            call.reject("Missing data");
-            return;
-        }
+        String stage = call.getString("stage");
+        Integer size = call.getInt("size");
+        try {
+            if (stage == null) {
+                // caminho antigo: tudo em base64 na chamada; vira arquivo temporário para seguir o mesmo fluxo
+                String b64 = call.getString("data");
+                if (b64 == null) { call.reject("Missing data"); return; }
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                stage = java.util.UUID.randomUUID().toString();
+                try (FileOutputStream out = new FileOutputStream(NativeStage.fileFor(getContext(), stage))) { out.write(bytes); }
+                size = bytes.length;
+            }
+            java.io.File f = NativeStage.fileFor(getContext(), stage);
+            if (!f.exists()) { call.reject("Arquivo temporário não encontrado"); return; }
+            if (size != null && f.length() != size.longValue()) { call.reject("Dados corrompidos na transferência (" + f.length() + " de " + size + " bytes)"); return; }
+            if (f.length() == 0) { call.reject("Conteúdo vazio: nada foi gravado"); f.delete(); return; }
+            prefs().edit().putString("stage", stage).putString("name", name).putLong("size", f.length()).apply();
+        } catch (Exception e) { call.reject("Save failed: " + e.getMessage()); return; }
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType(mime);
@@ -104,66 +125,76 @@ public class BlockbenchNativePlugin extends Plugin {
         startActivityForResult(call, intent, "saveFileResult");
     }
 
+    private void toastUi(final String msg) {
+        new Handler(Looper.getMainLooper()).post(() -> android.widget.Toast.makeText(getContext(), msg, android.widget.Toast.LENGTH_LONG).show());
+    }
+
     @ActivityCallback
     private void saveFileResult(PluginCall call, ActivityResult result) {
-        if (call == null) { Log.e("BlockbenchNative", "saveFileResult sem PluginCall: o arquivo escolhido ficou vazio"); return; }
+        android.content.SharedPreferences p = prefs();
+        String stage = p.getString("stage", null);
+        String wanted = p.getString("name", "file");
+        long size = p.getLong("size", -1);
+        p.edit().clear().apply();
+        if (stage == null) {
+            Log.e("BlockbenchNative", "saveFileResult sem preparo pendente");
+            if (call != null) call.reject("Nada pendente para salvar");
+            return;
+        }
+        java.io.File staged = null;
+        try { staged = NativeStage.fileFor(getContext(), stage); } catch (Exception ignored) { /* id inválido */ }
         Intent data = result.getData();
         if (result.getResultCode() != android.app.Activity.RESULT_OK || data == null || data.getData() == null) {
-            JSObject r = new JSObject();
-            r.put("cancelled", true);
-            call.resolve(r);
+            if (staged != null) staged.delete();
+            if (call != null) { JSObject r = new JSObject(); r.put("cancelled", true); call.resolve(r); }
             return;
         }
         Uri uri = data.getData();
-        String wanted = call.getString("name", "file");
         try {
-            String b64 = call.getString("data");
-            byte[] bytes = Base64.decode(b64 == null ? "" : b64, Base64.DEFAULT);
-            Integer expected = call.getInt("size");
-            if (expected != null && expected.intValue() != bytes.length) {
-                call.reject("Dados corrompidos na transferência (" + bytes.length + " de " + expected + " bytes)");
-                return;
+            if (staged == null || !staged.exists()) throw new IOException("o arquivo temporário sumiu");
+            if (size >= 0 && staged.length() != size) throw new IOException("temporário com " + staged.length() + " de " + size + " bytes");
+            long written = copyAndVerify(uri, staged);
+            String shown = displayName(uri, wanted);
+            staged.delete();
+            if (call != null) {
+                JSObject r = new JSObject();
+                r.put("uri", uri.toString());
+                r.put("name", shown);
+                r.put("bytes", written);
+                call.resolve(r);
+            } else {
+                toastUi("✔ " + shown + " (" + written + " bytes)");
             }
-            if (bytes.length == 0) { call.reject("Conteúdo vazio: nada foi gravado"); return; }
-            long written = writeAndVerify(uri, bytes);
-            JSObject r = new JSObject();
-            r.put("uri", uri.toString());
-            r.put("name", displayName(uri, wanted));
-            r.put("bytes", written);
-            call.resolve(r);
         } catch (Exception e) {
-            call.reject("Save failed: " + e.getMessage());
+            if (call != null) call.reject("Save failed: " + e.getMessage());
+            else toastUi("Save failed: " + e.getMessage());
         }
     }
 
-    /** Grava e CONFERE o tamanho final; tenta outros modos de abertura se o provedor deixar o arquivo vazio/incompleto. */
-    private long writeAndVerify(Uri uri, byte[] bytes) throws Exception {
+    /** Copia o arquivo temporário para o destino e CONFERE o tamanho final; tenta outros modos se o provedor deixar incompleto. */
+    private long copyAndVerify(Uri uri, java.io.File src) throws Exception {
         ContentResolver cr = getContext().getContentResolver();
+        long total = src.length();
         Exception last = null;
         for (String mode : new String[] { "wt", "rwt", "w" }) {
             try {
                 try (ParcelFileDescriptor pfd = cr.openFileDescriptor(uri, mode);
-                     FileOutputStream os = new FileOutputStream(pfd.getFileDescriptor())) {
-                    os.write(bytes);
+                     FileOutputStream os = new FileOutputStream(pfd.getFileDescriptor());
+                     java.io.FileInputStream in = new java.io.FileInputStream(src)) {
+                    byte[] buf = new byte[256 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
                     os.flush();
                     try { os.getFD().sync(); } catch (Exception ignored) { /* nem todo descritor aceita sync */ }
                 }
                 long len = sizeOf(cr, uri);
-                if (len < 0 || len == bytes.length) return bytes.length;   // -1 = provedor não informa o tamanho
-                last = new IOException("o provedor mostra " + len + " bytes em vez de " + bytes.length);
+                if (len < 0 || len == total) return total;   // -1 = provedor não informa o tamanho
+                last = new IOException("o provedor mostra " + len + " bytes em vez de " + total);
             } catch (Exception e) {
                 last = e;
             }
         }
-        // última tentativa pelo caminho clássico
-        try (OutputStream os = cr.openOutputStream(uri, "wt")) {
-            if (os == null) throw new IOException("não foi possível abrir o arquivo para escrita");
-            os.write(bytes);
-            os.flush();
-        }
-        long len = sizeOf(cr, uri);
-        if (len < 0 || len == bytes.length) return bytes.length;
-        throw last != null ? last : new IOException("tamanho gravado " + len + " != " + bytes.length);
+        throw last != null ? last : new IOException("não foi possível gravar o arquivo");
     }
 
     private long sizeOf(ContentResolver cr, Uri uri) {

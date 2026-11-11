@@ -9,10 +9,11 @@ import { t } from './i18n';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { initAndroidUi } from './android_menu';
 import { ignoreFileLimits, pickAnyFile } from './file_limits';
-import { contentToBytes, bytesToBase64 } from './export_data';
+import { contentToBytes, bytesToBase64, stageApi, stageBytes, discardStage } from './export_data';
 import { createNodeCompat, NodeCompat } from './node';
 import { createNativeRunner } from './node/native_proc';
 import { Store, toast } from './ui_kit';
+import { fileManagerEnabled, openFileManager, saveBytesTo, readAsFile, fmHooks } from './file_manager';
 
 let isNative = false;
 let Native: any = null;
@@ -75,6 +76,7 @@ export const AndroidBridge = {
 		if (!ignoreFileLimits() && options.extensions instanceof Array && options.extensions[0] && !options.extensions.includes(ext)) {
 			name += '.' + options.extensions[0];
 		}
+		(window as any).__bbSaving = true;
 		(async () => {
 			try {
 				const savetype = typeof options.savetype === 'function' ? options.savetype(name) : options.savetype;
@@ -85,13 +87,32 @@ export const AndroidBridge = {
 					toast(t('Nada foi salvo: o conteúdo gerado para "{0}" está vazio', name));
 					return;
 				}
-				const res = await Native.saveFile({ name, mime: mimeFor(name), data: bytesToBase64(bytes), size: bytes.length });
+				if (fileManagerEnabled()) {
+					// gerenciador de arquivos do app: escolhe pasta + nome e grava direto (sem o seletor do Android)
+					const pick = await openFileManager({ mode: 'save', name, extensions: options.extensions, title: options.title });
+					if (!pick) return;                                  // cancelado
+					if (pick.kind === 'path') {
+						saveBytesTo(pick.path, bytes);
+						toast(t('Salvo em {0}', pick.path), 3500);
+						if (typeof callback === 'function') callback(pick.path.slice(pick.path.lastIndexOf('/') + 1));
+						return;
+					}
+					// 'system': segue para o seletor do Android abaixo
+				}
+				const payload: any = { name, mime: mimeFor(name), size: bytes.length };
+				let stageId = '';
+				if (stageApi()) { stageId = stageBytes(bytes); payload.stage = stageId; }
+				else payload.data = bytesToBase64(bytes);
+				let res: any;
+				try { res = await Native.saveFile(payload); } catch (err) { if (stageId) discardStage(stageId); throw err; }
 				if (res && res.cancelled) return;
 				if (res && typeof res.bytes === 'number' && res.bytes !== bytes.length) throw new Error(t('foram gravados {0} de {1} bytes', res.bytes, bytes.length));
 				if (typeof callback === 'function') callback((res && res.name) || name);
 			} catch (err: any) {
 				console.error('Android save failed', err);
 				toast(t('Falha ao salvar: ') + (err?.message || err), 5000);
+			} finally {
+				(window as any).__bbSaving = false;
 			}
 		})();
 		return true;
@@ -112,9 +133,26 @@ export const AndroidBridge = {
 	/** True quando a opção "Ignorar limitação de arquivo" está ligada. */
 	ignoreFileLimits(): boolean { return isNative && ignoreFileLimits(); },
 
-	/** Seletor sem filtro de tipo. Devolve true se tratou a importação; false deixa o Blockbench usar o dele. */
+	/** Abre o gerenciador de arquivos do app (ou o seletor sem filtro). Devolve true se tratou a importação. */
 	importFile(options: any, cb: (files: File[]) => void): boolean {
-		if (!isNative || !ignoreFileLimits()) return false;
+		if (!isNative) return false;
+		const accept = !ignoreFileLimits() && options?.extensions?.length ? '.' + options.extensions.join(',.') : undefined;
+		if (fileManagerEnabled()) {
+			(async () => {
+				try {
+					const pick = await openFileManager({ mode: 'open', extensions: options?.extensions, multiple: options?.multiple === true, title: options?.title });
+					if (!pick) return;
+					if (pick.kind === 'system') { pickAnyFile(options?.multiple === true, cb, accept); return; }
+					const paths = pick.kind === 'path' ? [pick.path] : pick.paths;
+					cb(paths.map(p => readAsFile(p)));
+				} catch (err: any) {
+					console.error('Android open failed', err);
+					toast(t('Falha ao abrir: ') + (err?.message || err), 5000);
+				}
+			})();
+			return true;
+		}
+		if (!ignoreFileLimits()) return false;
 		pickAnyFile(options?.multiple === true, cb);
 		return true;
 	},
@@ -157,10 +195,20 @@ if (isNative) try {
 	(window as any).AndroidBridge = AndroidBridge;
 
 	// --- Session persistence ---
-	const flush = () => {
+	// Backup do projeto aberto. Com modelos grandes (ex.: centenas de animações) cada backup recompila o projeto
+	// inteiro: por isso não repete se nada mudou, e não roda enquanto um salvamento/seletor está aberto
+	// (era nessa hora, com a memória no limite, que o app podia fechar).
+	let lastKey = '', lastAt = 0;
+	const flush = (force?: any) => {
 		try {
 			const w = window as any;
-			if (w.AutoBackup?.db && w.Project) w.AutoBackup.backupOpenProject();
+			if (!(w.AutoBackup?.db && w.Project)) return;
+			if (w.__bbSaving && force !== true) return;
+			const P = w.Project;
+			const key = [P.uuid, P.undo?.index ?? '', P.saved ? 1 : 0, P.textures?.length ?? '', w.Animation?.all?.length ?? '', P.name].join('|');
+			if (key === lastKey && Date.now() - lastAt < 120000) return;
+			lastKey = key; lastAt = Date.now();
+			w.AutoBackup.backupOpenProject();
 		} catch (e) { console.error(e); }
 	};
 	document.addEventListener('visibilitychange', () => {
@@ -173,6 +221,7 @@ if (isNative) try {
 	});
 	// Reopening of previous projects happens in AutoBackup.initialize() (see patches/js_auto_backup.ts.patch)
 
+	fmHooks.requestAllFiles = () => { Native.requestAllFilesAccess(); };
 	if (pluginCompatEnabled()) { try { getCompat()?.installGlobals(); } catch (e) { console.error('Compat Node:', e); } }
 
 	// --- Menu flutuante, Enviar Input, configurações e controles de touch ---
